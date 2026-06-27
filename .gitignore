@@ -5,3 +5,8 @@
 .idea/modules.xml
 .idea/vcs.xml
 .idea/workspace.xml
+.env
+data/faiss_index/index.faiss
+/data/faiss_index
+.env
+.env
