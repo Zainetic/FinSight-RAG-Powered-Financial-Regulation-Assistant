@@ -1,0 +1,19 @@
+# --- API & Frontend ---
+fastapi
+uvicorn[standard]
+streamlit
+
+# --- LangChain Orchestration ---
+langchain
+langchain-community
+langchain-huggingface
+
+# --- Vector Database & Embeddings ---
+faiss-cpu
+sentence-transformers
+
+# --- Document Processing ---
+pypdf
+
+# --- Environment & Security ---
+python-dotenv
