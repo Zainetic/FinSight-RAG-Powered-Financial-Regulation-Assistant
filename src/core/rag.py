@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from typing import List
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
-from src.core.llm import get_mistral_llm
+from src.core.llm import get_qwen_llm
 
 FAISS_INDEX_DIR = "data/faiss_index"
 
