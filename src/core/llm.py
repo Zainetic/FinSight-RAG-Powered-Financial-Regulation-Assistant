@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def get_mistral_llm():
+def get_qwen_llm():
     """Initializes the remote Qwen fallback endpoint using the Conversational API."""
     api_token = os.getenv("HUGGINGFACEHUB_API_TOKEN")
     if not api_token:
