@@ -10,3 +10,4 @@ data/faiss_index/index.faiss
 /data/faiss_index
 .env
 .env
+/src/core/__pycache__
