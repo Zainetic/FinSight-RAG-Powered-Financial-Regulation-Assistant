@@ -13,9 +13,8 @@ class ComplianceCitation(BaseModel):
     document: str = Field(description="The filename of the regulation.")
     page: str = Field(description="The exact page number of the source.")
     quoted_text: str = Field(
-        description="A direct, verbatim text excerpt from the document snippet that justifies this citation."
+        description="A substantial, verbatim paragraph extracted directly from the document snippet. You MUST provide the complete surrounding sentence or paragraph so the quote stands alone and provides full legal context. Do not use short, ambiguous fragments."
     )
-
 
 class ComplianceJudgment(BaseModel):
     risk_category: str = Field(
