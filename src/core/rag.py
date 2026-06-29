@@ -73,7 +73,7 @@ def query_compliance_engine(user_query: str) -> dict:
     ]
 
     # 7. Invoke the LLM as a standard text completion engine
-    llm = get_mistral_llm()
+    llm = get_qwen_llm()
     raw_response = llm.invoke(messages)
 
     # 8. Extract the string content and parse it back into a validated dictionary
