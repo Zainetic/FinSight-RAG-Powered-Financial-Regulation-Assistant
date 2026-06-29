@@ -48,8 +48,10 @@ if st.button("Run Compliance Analysis", type="primary"):
                     st.markdown(result["executive_summary_markdown"])
 
                     st.subheader("Verified Citations")
+                    # Use Streamlit expanders to keep the UI clean while showing raw text
                     for idx, ref in enumerate(result["citations"], 1):
-                        st.caption(f"[{idx}] 📄 {ref['document']} (Page {ref['page']})")
+                        with st.expander(f"[{idx}] {ref['document']} (Page {ref['page']})"):
+                            st.info(f"**Verbatim Extract:**\n\n_{ref.get('quoted_text', 'No quote extracted.')}_")
 
                 with right_col:
                     st.subheader("Backend JSON Payload")

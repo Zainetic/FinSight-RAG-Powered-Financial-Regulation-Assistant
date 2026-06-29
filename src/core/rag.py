@@ -12,6 +12,9 @@ FAISS_INDEX_DIR = "data/faiss_index"
 class ComplianceCitation(BaseModel):
     document: str = Field(description="The filename of the regulation.")
     page: str = Field(description="The exact page number of the source.")
+    quoted_text: str = Field(
+        description="A direct, verbatim text excerpt from the document snippet that justifies this citation."
+    )
 
 
 class ComplianceJudgment(BaseModel):

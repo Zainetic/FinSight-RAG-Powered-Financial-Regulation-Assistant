@@ -2,6 +2,7 @@
 fastapi
 uvicorn[standard]
 streamlit
+torchvision
 
 # --- LangChain Orchestration ---
 langchain
