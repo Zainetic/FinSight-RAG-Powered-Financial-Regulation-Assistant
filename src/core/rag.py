@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import List
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_core.output_parsers import PydanticOutputParser
 from src.core.llm import get_qwen_llm
 
 FAISS_INDEX_DIR = "data/faiss_index"
@@ -30,8 +31,8 @@ class ComplianceJudgment(BaseModel):
 
 def query_compliance_engine(user_query: str) -> dict:
     """
-    Takes a query, retrieves context, and forces Qwen to output a
-    validated JSON object matching the ComplianceJudgment schema.
+    Takes a query, retrieves context, and uses an output parser to force Qwen
+    to return a string conforming to the ComplianceJudgment schema.
     """
     # 2. Re-initialize the local embedding model and FAISS
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
@@ -52,14 +53,18 @@ def query_compliance_engine(user_query: str) -> dict:
         page_num = doc.metadata.get("page", "Unknown")
         context_text += f"\n--- {source_file} (Page {page_num}) ---\n{doc.page_content}\n"
 
-    # 5. Build the strict prompt
+    # 5. Initialize the Pydantic Output Parser
+    parser = PydanticOutputParser(pydantic_object=ComplianceJudgment)
+
+    # 6. Build the prompt, injecting the schema's explicit format instructions
     messages = [
         (
             "system",
             "You are a strict regulatory compliance officer specialized in European Fintech and AI regulations. "
-            "Analyze the user's query strictly against the provided official legal context snippets. "
-            "You must output a structured JSON object matching the requested schema. "
-            "Do not assume rules outside the provided context snippets."
+            "Analyze the user's query strictly against the provided official legal context snippets.\n\n"
+            "CRITICAL: You must output your complete response as a single, valid JSON object that matches the structural schema defined below. "
+            "Do not include any conversational text, explanations, or markdown code blocks (like ```json) outside of the raw JSON payload.\n\n"
+            f"{parser.get_format_instructions()}"
         ),
         (
             "human",
@@ -67,13 +72,16 @@ def query_compliance_engine(user_query: str) -> dict:
         )
     ]
 
-    # 6. Initialize the LLM and bind the structured Pydantic schema
-    llm = get_qwen_llm()
-    structured_llm = llm.with_structured_output(ComplianceJudgment)
+    # 7. Invoke the LLM as a standard text completion engine
+    llm = get_mistral_llm()
+    raw_response = llm.invoke(messages)
 
-    # 7. Invoke the model. It automatically returns a validated Pydantic object!
-    response_obj = structured_llm.invoke(messages)
-
-    # 8. Convert the Pydantic object back into a standard dictionary
-    # so FastAPI can easily return it as a JSON payload to Streamlit
-    return response_obj.model_dump()
+    # 8. Extract the string content and parse it back into a validated dictionary
+    try:
+        parsed_obj = parser.parse(raw_response.content)
+        return parsed_obj.model_dump()
+    except Exception as parse_error:
+        # Fallback handling in case the model outputs markdown wrapping code blocks
+        clean_content = raw_response.content.strip().lstrip("```json").rstrip("```").strip()
+        parsed_obj = parser.parse(clean_content)
+        return parsed_obj.model_dump()
