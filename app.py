@@ -1,6 +1,7 @@
 import streamlit as st
 import json
 from src.core.rag import query_compliance_engine
+from src.core.database import save_compliance_record
 
 # Configure the page
 st.set_page_config(page_title="FinSight | AI Compliance", page_icon="⚖️", layout="wide")
@@ -25,7 +26,11 @@ if st.button("Run Compliance Analysis", type="primary"):
                 # 1. Call your RAG backend
                 result = query_compliance_engine(user_query)
 
-                # 2. Simulate saving the backend JSON to a database
+                # 2. Save the payload to PostgreSQL ---
+                save_compliance_record(user_query, result)
+                # -------------------------------------------
+
+                # 3. Convert to string for UI rendering
                 backend_json = json.dumps(result, indent=2)
 
                 # --- UI RENDERING ---
@@ -55,7 +60,7 @@ if st.button("Run Compliance Analysis", type="primary"):
 
                 with right_col:
                     st.subheader("Backend JSON Payload")
-                    st.caption("Data routed to database/event brokers:")
+                    st.caption("Data securely persisted to PostgreSQL database:")  
                     st.code(backend_json, language="json")
 
             except Exception as e:
