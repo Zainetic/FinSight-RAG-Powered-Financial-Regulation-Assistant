@@ -92,21 +92,35 @@ def query_compliance_engine(user_query: str) -> dict:
         parsed_obj = parser.parse(clean_content)
         result_dict = parsed_obj.model_dump()
 
-    # --- 9. Programmatic Deduplication ---
+    # --- 9. Programmatic Deduplication & Context Hydration (OUTSIDE the blocks) ---
     unique_citations = []
     seen_quotes = set()
 
     for citation in result_dict.get("citations", []):
-        # Normalize the string: remove leading/trailing spaces and make it lowercase
-        quote_text = citation.get("quoted_text", "").strip().lower()
+        original_fragment = citation.get("quoted_text", "").strip()
+        normalized_fragment = original_fragment.lower()
 
-        # If we haven't seen this exact normalized string before, add it to our clean list
-        if quote_text and quote_text not in seen_quotes:
-            seen_quotes.add(quote_text)
+        # Deduplication check
+        if normalized_fragment and normalized_fragment not in seen_quotes:
+            seen_quotes.add(normalized_fragment)
+
+            # --- CONTEXT HYDRATION ---
+            # Search through the original FAISS chunks to find where this fragment came from
+            for doc in relevant_docs:
+                doc_source = doc.metadata.get("source", "")
+                doc_page = str(doc.metadata.get("page", ""))
+
+                # If the file and page match, check if the LLM's fragment is inside this chunk
+                if doc_source == citation.get("document") and doc_page == citation.get("page"):
+                    if normalized_fragment in doc.page_content.lower():
+                        # We found the source! Replace the tiny fragment with the FULL FAISS chunk.
+                        full_context = " ".join(doc.page_content.split())
+                        citation["quoted_text"] = full_context
+                        break  # Stop searching chunks once hydrated
+
             unique_citations.append(citation)
 
-    # Overwrite the potentially looping citations with the clean list
+    # Overwrite the dirty list with the clean, fully-hydrated list
     result_dict["citations"] = unique_citations
 
-    # Return the final deduplicated dictionary
     return result_dict
