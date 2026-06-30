@@ -60,7 +60,7 @@ if st.button("Run Compliance Analysis", type="primary"):
 
                 with right_col:
                     st.subheader("Backend JSON Payload")
-                    st.caption("Data securely persisted to PostgreSQL database:")  
+                    st.caption("Data securely persisted to PostgreSQL database:")
                     st.code(backend_json, language="json")
 
             except Exception as e:

@@ -1,0 +1,20 @@
+# Exclude the local virtual environment
+.venv/
+venv/
+env/
+
+# Exclude local data caches, databases, and vector indexes
+data/
+*.db
+
+# Exclude Python bytecode caches
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Exclude source control logs and IDE configurations
+.git/
+.gitignore
+.vscode/
+.idea/
