@@ -16,6 +16,7 @@ class ComplianceCitation(BaseModel):
         description="A substantial, verbatim paragraph extracted directly from the document snippet. You MUST provide the complete surrounding sentence or paragraph so the quote stands alone and provides full legal context. Do not use short, ambiguous fragments."
     )
 
+
 class ComplianceJudgment(BaseModel):
     risk_category: str = Field(
         description="Must be strictly classified as: Prohibited, High-Risk, Specific Transparency, or Minimal Risk"
@@ -81,9 +82,28 @@ def query_compliance_engine(user_query: str) -> dict:
     # 8. Extract the string content and parse it back into a validated dictionary
     try:
         parsed_obj = parser.parse(raw_response.content)
-        return parsed_obj.model_dump()
+        result_dict = parsed_obj.model_dump()
     except Exception as parse_error:
         # Fallback handling in case the model outputs markdown wrapping code blocks
         clean_content = raw_response.content.strip().lstrip("```json").rstrip("```").strip()
         parsed_obj = parser.parse(clean_content)
-        return parsed_obj.model_dump()
+        result_dict = parsed_obj.model_dump()
+
+    # --- 9. Programmatic Deduplication ---
+    unique_citations = []
+    seen_quotes = set()
+
+    for citation in result_dict.get("citations", []):
+        # Normalize the string: remove leading/trailing spaces and make it lowercase
+        quote_text = citation.get("quoted_text", "").strip().lower()
+
+        # If we haven't seen this exact normalized string before, add it to our clean list
+        if quote_text and quote_text not in seen_quotes:
+            seen_quotes.add(quote_text)
+            unique_citations.append(citation)
+
+    # Overwrite the potentially looping citations with the clean list
+    result_dict["citations"] = unique_citations
+
+    # Return the final deduplicated dictionary
+    return result_dict
