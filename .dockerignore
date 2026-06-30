@@ -4,8 +4,10 @@ venv/
 env/
 
 # Exclude local data caches, databases, and vector indexes
-data/
+data/*
+!data/faiss_index/
 *.db
+*.sqlite3
 
 # Exclude Python bytecode caches
 **/__pycache__/
