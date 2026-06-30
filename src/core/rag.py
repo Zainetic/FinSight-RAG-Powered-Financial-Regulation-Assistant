@@ -28,9 +28,12 @@ class ComplianceJudgment(BaseModel):
         description="A list of the documents and pages used to make this judgment."
     )
     executive_summary_markdown: str = Field(
-        description="A detailed, human-readable markdown report explaining the legal analysis, using headings and bullet points."
+        description=(
+            "A detailed, human-readable markdown report explaining the legal analysis, using headings and bullet points. "
+            "CRITICAL STRICT RULE: You MUST NOT include a 'Citations', 'References', or 'Sources' section inside this markdown. "
+            "Do NOT manually list the document names or page numbers in this summary. You must leave citation tracking entirely to the separate structured 'citations' array."
+        )
     )
-
 
 def query_compliance_engine(user_query: str) -> dict:
     """
