@@ -2,11 +2,11 @@
 fastapi
 uvicorn[standard]
 streamlit
-torchvision
 
 # --- LangChain Orchestration ---
 langchain
 langchain-community
+langchain-google-genai
 langchain-huggingface
 
 # --- Vector Database & Embeddings ---
