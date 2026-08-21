@@ -1,11 +1,17 @@
+# Exclude local environment files to prevent baking secrets into Docker image layers
+.env
+.env.*
+.env.local
+
 # Exclude the local virtual environment
 .venv/
 venv/
 env/
 
-# Exclude local data caches, databases, and vector indexes
-data/*
+# Exclude raw PDFs and local DB files while preserving pre-built FAISS index
+data/raw_pdfs/
 !data/faiss_index/
+!data/faiss_index/**
 *.db
 *.sqlite3
 
@@ -19,4 +25,4 @@ data/*
 .git/
 .gitignore
 .vscode/
-.idea/
+.idea/
