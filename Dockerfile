@@ -2,14 +2,34 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-# Copying the requirements file and install dependencies
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# Install curl for container healthcheck
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Copying the rest of the application code
-COPY . .
+# 1. FORCE THE CPU-ONLY PYTORCH INSTALL FIRST (Blocks the heavy CUDA/GPU download)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 
-# Exposing Streamlit's default port
+# 2. INSTALL APPLICATION DEPENDENCIES (Locks dependency resolution to CPU-only PyTorch)
+RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
+
+# Create a non-root application user
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
+
+COPY --chown=appuser:appuser . .
+
+USER appuser
+
 EXPOSE 8501
 
-CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8501/_stcore/health || exit 1
+
+CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501"]
+
