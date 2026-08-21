@@ -1,4 +1,10 @@
+import os
 import json
+from dotenv import load_dotenv
+
+# Load local environment configuration (.env)
+load_dotenv()
+
 from src.core.rag import query_compliance_engine
 
 
@@ -9,7 +15,7 @@ def run_test():
     )
 
     print("Contacting FAISS vector index...")
-    print("Requesting Pydantic-validated structured response from LLM...")
+    print("Requesting Pydantic-validated structured response from Gemini LLM...")
     print("-" * 60)
 
     try:
@@ -41,9 +47,11 @@ def run_test():
 
     except AssertionError as ae:
         print(f"Contract Validation Failed: {ae}")
+        raise
     except Exception as e:
         print(f"Pipeline Execution Failed: {e}")
+        raise
 
 
 if __name__ == "__main__":
-    run_test()
+    run_test()
