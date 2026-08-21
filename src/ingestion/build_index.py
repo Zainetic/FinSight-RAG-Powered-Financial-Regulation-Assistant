@@ -4,6 +4,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
+from src.core.rag import clean_regulatory_text
 
 # Dynamically find the project root relative to this file's location
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))  # src/ingestion
@@ -20,7 +21,8 @@ def load_and_parse_pdfs(pdf_dir):
     documents = []
 
     if not os.path.exists(pdf_dir):
-        print(f"Error: Directory '{pdf_dir}' does not exist.")
+        print(f"Directory '{pdf_dir}' does not exist. Creating it...")
+        os.makedirs(pdf_dir, exist_ok=True)
         return documents
 
     for filename in os.listdir(pdf_dir):
@@ -33,9 +35,10 @@ def load_and_parse_pdfs(pdf_dir):
                 for page_num, page in enumerate(reader.pages):
                     text = page.extract_text()
                     if text and text.strip():
+                        cleaned_text = clean_regulatory_text(text)
                         # We wrap the text and metadata inside LangChain's Document object
                         doc = Document(
-                            page_content=text,
+                            page_content=cleaned_text,
                             metadata={
                                 "source": filename,
                                 "page": page_num + 1
@@ -53,7 +56,7 @@ def main():
     print("Step 1: Extracting text from PDFs")
     raw_documents = load_and_parse_pdfs(RAW_PDF_DIR)
     if not raw_documents:
-        print("No documents found or processed")
+        print(f"No PDF documents found or processed in '{RAW_PDF_DIR}'.")
         return
     print(f"Extracted {len(raw_documents)} total pages across documents.")
 
@@ -73,6 +76,7 @@ def main():
 
     # 4. Generate Embeddings and Save to FAISS Store
     print("\n--- Step 4: Building and saving FAISS Vector Database ---")
+    os.makedirs(FAISS_INDEX_DIR, exist_ok=True)
     vector_db = FAISS.from_documents(chunked_docs, embeddings)
 
     # Save index locally so the API can read it instantly later without recalculating
@@ -81,4 +85,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main()
