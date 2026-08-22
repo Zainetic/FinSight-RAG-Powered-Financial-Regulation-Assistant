@@ -6,7 +6,7 @@
 [![Google Gemini](https://img.shields.io/badge/LLM-Gemini%20Flash-4285F4?style=flat&logo=google&logoColor=white)](https://aistudio.google.com)
 [![PostgreSQL](https://img.shields.io/badge/Ledger-PostgreSQL%2016-4169E1?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org)
 [![Docker](https://img.shields.io/badge/Deployment-Docker%20Compose-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](#-license--copyright)
 
 **FinSight** is an enterprise-grade Regulatory Technology (RegTech) platform and automated compliance gatekeeper. It cross-references fintech software architectures, data flows, and machine learning deployments against regional regulatory frameworks (**EU AI Act 2024/1689**, **GDPR 2016/679**, **PSD2 2015/2366**, **UK DPA 2018**, and **US CCPA/CPRA**), sealing every audit determination into an immutable, cryptographic SHA-256 PostgreSQL ledger.
 
@@ -305,6 +305,11 @@ To ingest additional regulatory acts or national laws into the FAISS vector inde
 
 ---
 
-## 📜 License
+## 📜 License & Copyright
 
-Distributed under the **MIT License**. See `LICENSE` for more information.
+**Copyright © 2026. All Rights Reserved.**
+
+This repository, source code, architecture, and associated documentation are **Proprietary and Confidential**.
+
+* **Permitted Use**: You are granted permission to view and examine this source code for personal review, evaluation, and educational demonstration purposes only.
+* **Prohibited Use**: No part of this codebase may be copied, modified, redistributed, commercialized, sublicensed, or used in production systems without explicit, prior written permission from the copyright owner.
