@@ -14,9 +14,9 @@ export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim() || !password) return;
+  const handleLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!email.trim() || !password || isLoading) return;
 
     setIsLoading(true);
     setErrorMessage(null);
@@ -41,6 +41,43 @@ export default function LoginPage() {
       login(data.access_token, data.user);
 
       // Redirect to main compliance dashboard
+      router.push("/");
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to connect to authentication server.";
+      setErrorMessage(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const triggerDemoLogin = async (demoEmail: string) => {
+    if (isLoading) return;
+    const demoPw = "demo123";
+    setEmail(demoEmail);
+    setPassword(demoPw);
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const res = await fetch("http://localhost:8000/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: demoEmail,
+          password: demoPw,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.detail || `Demo login failed (${res.status})`);
+      }
+
+      login(data.access_token, data.user);
       router.push("/");
     } catch (err: unknown) {
       const message =
@@ -156,7 +193,7 @@ export default function LoginPage() {
             </div>
 
             {errorMessage && (
-              <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center space-x-2">
+              <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center space-x-2 animate-in fade-in duration-200">
                 <span>⚠️</span>
                 <span>{errorMessage}</span>
               </div>
@@ -173,8 +210,8 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@fintechcorp.com"
-                  className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3.5 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 backdrop-blur-md transition-all font-light"
+                  placeholder="admin@nordicpayments.eu"
+                  className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3.5 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md transition-all duration-200 ease-out font-light"
                 />
               </div>
 
@@ -189,7 +226,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3.5 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 backdrop-blur-md transition-all font-light"
+                  className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3.5 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md transition-all duration-200 ease-out font-light"
                 />
               </div>
 
@@ -197,10 +234,13 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isLoading || !email.trim() || !password}
-                className="w-full mt-2 py-3.5 px-6 rounded-2xl bg-white hover:bg-white/90 text-slate-950 font-medium text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98] shadow-[0_4px_20px_0_rgba(255,255,255,0.15)]"
+                className="w-full mt-2 py-3.5 px-6 rounded-2xl bg-white hover:bg-white/90 text-slate-950 font-medium text-sm transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-95 shadow-[0_4px_20px_0_rgba(255,255,255,0.15)]"
               >
                 {isLoading ? (
-                  <span>Authenticating...</span>
+                  <>
+                    <span className="inline-block animate-spin">⏳</span>
+                    <span>Authenticating...</span>
+                  </>
                 ) : (
                   <>
                     <span>Sign In</span>
@@ -208,6 +248,45 @@ export default function LoginPage() {
                   </>
                 )}
               </button>
+
+              {/* Fast-Track Demo Quick Access */}
+              <div className="pt-3 space-y-2 border-t border-white/10">
+                <div className="flex items-center justify-between text-[10px] text-white/40 uppercase tracking-wider font-mono">
+                  <span>Fast-Track Demo Access</span>
+                  <span>pw: demo123</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => triggerDemoLogin("dev@nordicpayments.eu")}
+                    disabled={isLoading}
+                    className="px-2.5 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 hover:border-emerald-500/35 text-xs font-mono transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 text-center flex flex-col items-center justify-center space-y-0.5 shadow-sm"
+                  >
+                    <span className="font-semibold text-[11px]">Demo Developer</span>
+                    <span className="text-[9px] text-emerald-400/70 font-sans">No Override</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => triggerDemoLogin("manager@nordicpayments.eu")}
+                    disabled={isLoading}
+                    className="px-2.5 py-2.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/20 hover:border-sky-500/35 text-xs font-mono transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 text-center flex flex-col items-center justify-center space-y-0.5 shadow-sm"
+                  >
+                    <span className="font-semibold text-[11px]">Demo Manager</span>
+                    <span className="text-[9px] text-sky-400/70 font-sans">Full Override</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => triggerDemoLogin("admin@nordicpayments.eu")}
+                    disabled={isLoading}
+                    className="px-2.5 py-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/20 hover:border-purple-500/35 text-xs font-mono transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 text-center flex flex-col items-center justify-center space-y-0.5 shadow-sm"
+                  >
+                    <span className="font-semibold text-[11px]">Demo Admin</span>
+                    <span className="text-[9px] text-purple-400/70 font-sans">Team Mgmt</span>
+                  </button>
+                </div>
+              </div>
             </form>
 
             {/* Link to Register Org */}
@@ -216,7 +295,7 @@ export default function LoginPage() {
                 Need to onboard a new organization?{" "}
                 <Link
                   href="/register"
-                  className="text-indigo-300 hover:text-indigo-200 font-medium underline underline-offset-4 transition-colors"
+                  className="text-indigo-300 hover:text-indigo-200 font-medium underline underline-offset-4 transition-colors duration-200"
                 >
                   Register Organization
                 </Link>
