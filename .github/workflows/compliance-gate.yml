@@ -1,0 +1,22 @@
+name: RegTech Compliance Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  run-compliance-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
+      - name: Execute FInSIght Scan
+        run: |
+          curl -f -X POST "http://your-production-server/api/v1/scan-repo" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "repo_name": "${{ github.repository }}",
+            "commit_hash": "${{ github.event.pull_request.head.sha }}",
+            "architecture_changes": "Automated PR scan initiated."
+          }'
