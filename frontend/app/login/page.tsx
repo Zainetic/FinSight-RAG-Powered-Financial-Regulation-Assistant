@@ -22,7 +22,8 @@ export default function LoginPage() {
     setErrorMessage(null);
 
     try {
-      const res = await fetch("http://localhost:8000/api/v1/auth/login", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/v1/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -62,7 +63,8 @@ export default function LoginPage() {
     setErrorMessage(null);
 
     try {
-      const res = await fetch("http://localhost:8000/api/v1/auth/login", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/v1/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -89,6 +91,7 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen w-full grid grid-cols-1 lg:grid-cols-2 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-slate-900 via-[#130d25] to-slate-950 text-white/90 font-sans selection:bg-indigo-500/30 selection:text-white">

@@ -236,7 +236,8 @@ export default function ComplianceDashboard() {
     });
 
     try {
-      const res = await fetch("http://localhost:8000/api/v1/evaluate", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/v1/evaluate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -338,7 +339,7 @@ export default function ComplianceDashboard() {
       const message =
         err instanceof Error
           ? err.message
-          : "Failed to connect to FastAPI backend at http://localhost:8000";
+          : "Failed to connect to FastAPI backend service.";
       setErrorMessage(message);
     } finally {
       setIsLoading(false);
@@ -353,7 +354,8 @@ export default function ComplianceDashboard() {
     setOverrideError(null);
 
     try {
-      const res = await fetch("http://localhost:8000/api/v1/override", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/v1/override`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -387,7 +389,8 @@ export default function ComplianceDashboard() {
     setIsLoadingLedger(true);
     setShowLedgerModal(true);
     try {
-      const res = await fetch("http://localhost:8000/api/v1/ledger?limit=10", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/v1/ledger?limit=10`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -402,6 +405,7 @@ export default function ComplianceDashboard() {
       setIsLoadingLedger(false);
     }
   };
+
 
   if (isAuthLoading || !isAuthenticated) {
     return (

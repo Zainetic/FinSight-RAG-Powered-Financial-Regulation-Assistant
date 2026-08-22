@@ -43,7 +43,8 @@ export default function AdminPage() {
     if (!token) return;
     setIsLoadingMembers(true);
     try {
-      const res = await fetch("http://localhost:8000/api/v1/auth/users", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/v1/auth/users`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -75,7 +76,8 @@ export default function AdminPage() {
     setFormSuccess(null);
 
     try {
-      const res = await fetch("http://localhost:8000/api/v1/auth/create-user", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/v1/auth/create-user`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -106,6 +108,7 @@ export default function AdminPage() {
       setIsSubmitting(false);
     }
   };
+
 
   const formatTimestamp = (raw: string): string => {
     try {

@@ -34,7 +34,8 @@ export default function RegisterPage() {
     setErrorMessage(null);
 
     try {
-      const res = await fetch("http://localhost:8000/api/v1/auth/register-org", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/v1/auth/register-org`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -58,6 +59,7 @@ export default function RegisterPage() {
         org_id: data.organization.id,
         org_name: data.organization.name,
       });
+
 
       // Redirect to main compliance dashboard
       router.push("/");
