@@ -5,6 +5,7 @@ from src.core.database import init_db
 from src.core.ledger import init_ledger_table
 from src.api.routes import router as compliance_router
 from src.api.auth import router as auth_router
+import re
 
 
 @asynccontextmanager
@@ -25,14 +26,20 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Enable CORS for Next.js frontend (http://localhost:3000)
+# Allow local development and any Vercel deployment preview/production domain
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://finsight.vercel.app",
+]
+
+# Regex to automatically whitelist any Vercel preview branch for this project
+origin_regex = r"https://finsight(-[a-zA-Z0-9-]+)?-zain-130c\.vercel\.app"
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000"
-    ],
+    allow_origins=origins,
+    allow_origin_regex=origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
