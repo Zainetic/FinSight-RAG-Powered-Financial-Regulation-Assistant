@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.core.database import init_db
 from src.core.ledger import init_ledger_table
 from src.api.routes import router as compliance_router
+from src.api.auth import router as auth_router
 
 
 @asynccontextmanager
@@ -17,11 +18,10 @@ async def lifespan(app: FastAPI):
     yield
 
 
-
 app = FastAPI(
     title="FinSight RegTech API",
-    description="Enterprise Regulatory Compliance Gatekeeper for Fintech & AI Architectures",
-    version="1.0.0",
+    description="Enterprise Multi-Tenant Regulatory Compliance Gatekeeper with RBAC and SHA-256 Ledger",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -38,7 +38,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include Core RegTech Routers
+# Include Core Authentication & RegTech Routers
+app.include_router(auth_router)
 app.include_router(compliance_router)
 
 
@@ -47,10 +48,11 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "FinSight RegTech Engine",
-        "version": "1.0.0"
+        "version": "2.0.0"
     }
 
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("src.api.main:app", host="0.0.0.0", port=8000, reload=True)
+
