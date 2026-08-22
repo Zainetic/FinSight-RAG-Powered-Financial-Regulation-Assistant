@@ -1,13 +1,81 @@
-.idea/FInSIght.iml
-.idea/inspectionProfiles/profiles_settings.xml
-.idea/inspectionProfiles/Project_Default.xml
-.idea/misc.xml
-.idea/modules.xml
-.idea/vcs.xml
-.idea/workspace.xml
+# =====================================================================
+# FinSight RegTech Compliance Gatekeeper - Root .gitignore
+# =====================================================================
+
+# 1. SECRETS & ENVIRONMENT VARIABLES (CRITICAL)
 .env
-data/faiss_index/index.faiss
-/data/faiss_index
-.env
-.env
-/src/core/__pycache__
+*.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+! .env.example
+
+# 2. PYTHON & BACKEND (FastAPI / LangChain / PyTorch)
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual Environments
+.venv/
+backend/.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# 3. NODE & FRONTEND (Next.js / React / Turbopack)
+node_modules/
+frontend/node_modules/
+*/node_modules/
+.next/
+frontend/.next/
+*/.next/
+out/
+frontend/out/
+*/out/
+
+# Logs & Package Manager Caches
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# TypeScript build info
+*.tsbuildinfo
+
+# 4. DATABASE RUNTIME DATA
+postgres_data/
+*.sqlite3
+*.sql.gz
+
+# 5. IDE & OPERATING SYSTEM ARTIFACTS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
