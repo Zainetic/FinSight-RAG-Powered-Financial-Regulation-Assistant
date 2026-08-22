@@ -1,5 +1,5 @@
 services:
-  # The PostgreSQL Database Service
+  # 1. PostgreSQL Database Service
   db:
     image: postgres:16-alpine
     container_name: finsight_postgres
@@ -18,24 +18,36 @@ services:
     networks:
       - finsight_network
 
-  # The Streamlit Web App Service
-  web:
-    build: .
-    container_name: finsight_ui
+  # 2. FastAPI Backend Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: finsight_backend
     restart: always
     env_file:
       - .env
+    environment:
+      - DB_HOST=db
     ports:
-      - "8501:8501"
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+    networks:
+      - finsight_network
+
+  # 3. Next.js Frontend Service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: finsight_frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
     networks:
       - finsight_network
 
@@ -45,4 +57,3 @@ volumes:
 networks:
   finsight_network:
     driver: bridge
-
