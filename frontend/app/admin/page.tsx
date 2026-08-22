@@ -139,7 +139,7 @@ export default function AdminPage() {
           </p>
           <Link
             href="/"
-            className="inline-block mt-4 px-6 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium border border-white/10 transition-all"
+            className="inline-block mt-4 px-6 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium border border-white/10 transition-all duration-200 ease-out active:scale-95"
           >
             &larr; Return to Compliance Dashboard
           </Link>
@@ -157,12 +157,12 @@ export default function AdminPage() {
       </div>
 
       {/* Header */}
-      <header className="border-b border-white/10 bg-white/[0.02] backdrop-blur-2xl sticky top-0 z-40">
+      <header className="border-b border-white/10 bg-white/[0.02] backdrop-blur-2xl sticky top-0 z-40 transition-all duration-200">
         <div className="max-w-6xl mx-auto px-6 sm:px-8 h-20 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Link
               href="/"
-              className="h-10 w-10 rounded-2xl bg-white/[0.08] border border-white/15 flex items-center justify-center text-lg hover:bg-white/15 transition-all"
+              className="h-10 w-10 rounded-2xl bg-white/[0.08] border border-white/15 flex items-center justify-center text-lg hover:bg-white/15 transition-all duration-200 ease-out active:scale-95"
               title="Return to Dashboard"
             >
               <span>&larr;</span>
@@ -185,13 +185,13 @@ export default function AdminPage() {
           <div className="flex items-center space-x-3">
             <Link
               href="/"
-              className="text-xs px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-white/80 border border-white/15 backdrop-blur-xl transition-all"
+              className="text-xs px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-white/80 hover:text-white border border-white/15 backdrop-blur-xl transition-all duration-200 ease-out active:scale-95"
             >
               Compliance Engine
             </Link>
             <button
               onClick={logout}
-              className="text-xs px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 backdrop-blur-xl transition-all"
+              className="text-xs px-4 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 backdrop-blur-xl transition-all duration-200 ease-out active:scale-95"
             >
               Sign Out
             </button>
@@ -200,7 +200,7 @@ export default function AdminPage() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-5xl mx-auto px-6 sm:px-8 py-12 flex-1 w-full space-y-12 relative z-10">
+      <main className="max-w-5xl mx-auto px-6 sm:px-8 py-12 flex-1 w-full space-y-10 relative z-10">
         {/* Title */}
         <section className="space-y-2">
           <h1 className="text-3xl sm:text-4xl font-light tracking-tight text-white/95">
@@ -211,9 +211,9 @@ export default function AdminPage() {
           </p>
         </section>
 
-        {/* Top: User Creation Form */}
+        {/* Top: User Creation Form with Perfectly Aligned Flex Header & Action Button */}
         <section className="bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[2.5rem] p-8 sm:p-10 space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between w-full border-b border-white/5 pb-4">
             <div className="flex items-center space-x-3">
               <span className="text-2xl">➕</span>
               <h2 className="text-xl sm:text-2xl font-light text-white/95 tracking-tight">
@@ -226,61 +226,61 @@ export default function AdminPage() {
           </div>
 
           {formSuccess && (
-            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center space-x-2">
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center space-x-2 animate-in fade-in duration-200">
               <span>✅</span>
               <span>{formSuccess}</span>
             </div>
           )}
 
           {formError && (
-            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center space-x-2">
+            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center space-x-2 animate-in fade-in duration-200">
               <span>⚠️</span>
               <span>{formError}</span>
             </div>
           )}
 
-          <form onSubmit={handleCreateUser} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* Email */}
-            <div className="space-y-1.5 sm:col-span-1">
-              <label className="text-xs font-medium text-white/70 block">
-                User Email
-              </label>
-              <input
-                type="email"
-                required
-                value={newUserEmail}
-                onChange={(e) => setNewUserEmail(e.target.value)}
-                placeholder="developer@company.com"
-                className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-indigo-500/50 backdrop-blur-md font-light"
-              />
-            </div>
+          <form onSubmit={handleCreateUser} className="space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Field 1: Email */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-white/70 block">
+                  User Email
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  placeholder="developer@company.com"
+                  className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3.5 text-xs sm:text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md font-light transition-all duration-200 ease-out"
+                />
+              </div>
 
-            {/* Password */}
-            <div className="space-y-1.5 sm:col-span-1">
-              <label className="text-xs font-medium text-white/70 block">
-                Initial Password
-              </label>
-              <input
-                type="password"
-                required
-                minLength={8}
-                value={newUserPassword}
-                onChange={(e) => setNewUserPassword(e.target.value)}
-                placeholder="Minimum 8 characters"
-                className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-indigo-500/50 backdrop-blur-md font-light"
-              />
-            </div>
+              {/* Field 2: Password */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-white/70 block">
+                  Initial Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  placeholder="Minimum 8 characters"
+                  className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3.5 text-xs sm:text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md font-light transition-all duration-200 ease-out"
+                />
+              </div>
 
-            {/* Role Selector & Submit */}
-            <div className="space-y-1.5 sm:col-span-1">
-              <label className="text-xs font-medium text-white/70 block">
-                RBAC Role Assignment
-              </label>
-              <div className="flex space-x-2">
+              {/* Field 3: Role Assignment */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-white/70 block">
+                  RBAC Role Assignment
+                </label>
                 <select
                   value={newUserRole}
                   onChange={(e) => setNewUserRole(e.target.value as "DEVELOPER" | "MANAGER")}
-                  className="bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white/90 focus:outline-none focus:border-indigo-500/50 backdrop-blur-md font-light flex-1"
+                  className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3.5 text-xs sm:text-sm text-white/90 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md font-light transition-all duration-200 ease-out"
                 >
                   <option value="DEVELOPER" className="bg-slate-900 text-white">
                     DEVELOPER (Read / Evaluate)
@@ -289,21 +289,38 @@ export default function AdminPage() {
                     MANAGER (Full Override)
                   </option>
                 </select>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !newUserEmail.trim() || !newUserPassword}
-                  className="px-5 py-3 rounded-2xl bg-white hover:bg-white/90 text-slate-950 font-medium text-xs sm:text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap active:scale-95 shadow-md shadow-white/10"
-                >
-                  {isSubmitting ? "Adding..." : "Add User"}
-                </button>
               </div>
+            </div>
+
+            {/* Bottom Form Action Bar: Vertically Centered Flexbox Alignment */}
+            <div className="flex flex-col sm:flex-row items-center justify-between w-full gap-3 pt-2">
+              <p className="text-xs text-white/40 font-light text-center sm:text-left">
+                User will immediately receive credentials to run compliance evaluations under this tenant.
+              </p>
+              <button
+                type="submit"
+                disabled={isSubmitting || !newUserEmail.trim() || !newUserPassword}
+                className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-white hover:bg-white/90 text-slate-950 font-medium text-xs sm:text-sm transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-95 shadow-[0_4px_20px_0_rgba(255,255,255,0.15)] whitespace-nowrap"
+              >
+                {isSubmitting ? (
+                  <>
+                    <span className="inline-block animate-spin">⏳</span>
+                    <span>Provisioning Account...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>➕</span>
+                    <span>Add User</span>
+                  </>
+                )}
+              </button>
             </div>
           </form>
         </section>
 
         {/* Bottom: Team Members Directory */}
         <section className="bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[2.5rem] p-8 sm:p-10 space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between w-full border-b border-white/5 pb-4">
             <div className="flex items-center space-x-3">
               <span className="text-2xl">👥</span>
               <h2 className="text-xl sm:text-2xl font-light text-white/95 tracking-tight">
@@ -312,9 +329,9 @@ export default function AdminPage() {
             </div>
             <button
               onClick={fetchTeamMembers}
-              className="text-xs text-white/60 hover:text-white px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all font-mono"
+              className="text-xs text-white/70 hover:text-white px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all duration-200 ease-out font-mono active:scale-95"
             >
-              ↻ Refresh
+              ↻ Refresh List
             </button>
           </div>
 
@@ -343,7 +360,7 @@ export default function AdminPage() {
                   </tr>
                 ) : (
                   members.map((m) => (
-                    <tr key={m.id} className="hover:bg-white/[0.02] transition-colors">
+                    <tr key={m.id} className="hover:bg-white/[0.04] transition-colors duration-200">
                       <td className="py-4 px-4 font-sans text-white/90">
                         {m.email}
                         {m.id === user?.id && (
