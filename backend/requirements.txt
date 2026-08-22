@@ -18,6 +18,15 @@ pypdf
 
 # --- Environment & Security ---
 python-dotenv
+passlib[bcrypt]
+bcrypt
+python-jose[cryptography]
+PyJWT
+email-validator
 
 # --- Database ---
 psycopg2-binary
+sqlalchemy
+asyncpg
+
+
