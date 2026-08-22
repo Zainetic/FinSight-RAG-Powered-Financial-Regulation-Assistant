@@ -18,7 +18,7 @@ export default function RegisterPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orgName.trim() || !adminEmail.trim() || !password) return;
+    if (!orgName.trim() || !adminEmail.trim() || !password || isLoading) return;
 
     if (password !== confirmPassword) {
       setErrorMessage("Passwords do not match.");
@@ -90,7 +90,7 @@ export default function RegisterPage() {
             <span className="font-semibold text-lg tracking-tight text-white/95">
               FinSight
             </span>
-            <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 font-mono">
+            <span className="ml-2 text-[10px] px-2.5 py-0.5 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/25 font-mono">
               B2B Onboarding
             </span>
           </div>
@@ -108,7 +108,7 @@ export default function RegisterPage() {
           </div>
 
           {errorMessage && (
-            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center space-x-2">
+            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center space-x-2 animate-in fade-in duration-200">
               <span>⚠️</span>
               <span>{errorMessage}</span>
             </div>
@@ -126,7 +126,7 @@ export default function RegisterPage() {
                 value={orgName}
                 onChange={(e) => setOrgName(e.target.value)}
                 placeholder="Acme Payments Europe"
-                className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 backdrop-blur-md transition-all font-light"
+                className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md transition-all duration-200 ease-out font-light"
               />
             </div>
 
@@ -141,7 +141,7 @@ export default function RegisterPage() {
                 value={adminEmail}
                 onChange={(e) => setAdminEmail(e.target.value)}
                 placeholder="admin@acmepayments.com"
-                className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 backdrop-blur-md transition-all font-light"
+                className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md transition-all duration-200 ease-out font-light"
               />
             </div>
 
@@ -157,7 +157,7 @@ export default function RegisterPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Minimum 8 characters"
-                className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 backdrop-blur-md transition-all font-light"
+                className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md transition-all duration-200 ease-out font-light"
               />
             </div>
 
@@ -173,7 +173,7 @@ export default function RegisterPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Re-enter password"
-                className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 backdrop-blur-md transition-all font-light"
+                className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md transition-all duration-200 ease-out font-light"
               />
             </div>
 
@@ -181,10 +181,13 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isLoading || !orgName.trim() || !adminEmail.trim() || !password}
-              className="w-full mt-2 py-3.5 px-6 rounded-2xl bg-white hover:bg-white/90 text-slate-950 font-medium text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98] shadow-[0_4px_20px_0_rgba(255,255,255,0.15)]"
+              className="w-full mt-2 py-3.5 px-6 rounded-2xl bg-white hover:bg-white/90 text-slate-950 font-medium text-sm transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-95 shadow-[0_4px_20px_0_rgba(255,255,255,0.15)]"
             >
               {isLoading ? (
-                <span>Generating Genesis Block & Account...</span>
+                <>
+                  <span className="inline-block animate-spin">⏳</span>
+                  <span>Generating Genesis Block & Account...</span>
+                </>
               ) : (
                 <>
                   <span>Initialize Organization</span>
@@ -200,7 +203,7 @@ export default function RegisterPage() {
               Already registered?{" "}
               <Link
                 href="/login"
-                className="text-indigo-300 hover:text-indigo-200 font-medium underline underline-offset-4 transition-colors"
+                className="text-indigo-300 hover:text-indigo-200 font-medium underline underline-offset-4 transition-colors duration-200"
               >
                 Sign In to Existing Org
               </Link>
