@@ -1,11 +1,16 @@
 import os
 import uuid
-from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Query, status
-from fastapi.responses import JSONResponse, StreamingResponse
 import json
+from typing import Optional, List, Dict, Any
+from fastapi import APIRouter, HTTPException, Depends, Query, status
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from src.core.auth import (
+    get_current_user,
+    CurrentUser,
+    UserRole
+)
 from src.core.rag import query_compliance_engine, astream_compliance_engine
 from src.core.database import save_compliance_record
 from src.core.ledger import (
@@ -38,6 +43,7 @@ class EvaluateRequest(BaseModel):
 
 class EvaluateResponse(BaseModel):
     audit_id: str
+    org_id: Optional[str] = None
     tx_hash: str
     prev_hash: str
     timestamp: str
@@ -66,6 +72,7 @@ class OverrideRequest(BaseModel):
 class OverrideResponse(BaseModel):
     audit_id: str
     original_audit_id: str
+    org_id: Optional[str] = None
     timestamp: str
     model_provenance: str
     prev_hash: str
@@ -103,6 +110,7 @@ class WebhookScanResponse(BaseModel):
     audit_id: str
     is_compliant: bool
     tx_hash: str
+    org_id: Optional[str] = None
     repo_name: Optional[str] = None
     commit_hash: Optional[str] = None
     risk_category: Optional[str] = None
@@ -114,14 +122,17 @@ class WebhookScanResponse(BaseModel):
 
 @router.post(
     "/api/v1/evaluate",
-    summary="Evaluate Architectural Compliance (Streaming SSE)",
+    summary="Evaluate Architectural Compliance (Streaming SSE, Authenticated)",
     description=(
         "Executes high-speed LangChain RAG streaming against FAISS, "
         "streams generated Markdown tokens in real-time via Server-Sent Events (SSE), "
-        "and anchors the final compliance judgment into the immutable SHA-256 PostgreSQL ledger."
+        "and anchors the final compliance judgment into the tenant's immutable SHA-256 PostgreSQL ledger."
     )
 )
-async def evaluate_architecture(request: EvaluateRequest):
+async def evaluate_architecture(
+    request: EvaluateRequest,
+    current_user: CurrentUser = Depends(get_current_user)
+):
     async def sse_generator():
         accumulated_tokens: List[str] = []
         citations: List[Dict[str, Any]] = []
@@ -167,21 +178,30 @@ async def evaluate_architecture(request: EvaluateRequest):
                 "is_compliant": is_compliant,
                 "executive_summary_markdown": full_summary_text,
                 "citations": citations,
-                "jurisdictions": request.jurisdictions or ["EU (AI Act, GDPR, PSD2)"]
+                "jurisdictions": request.jurisdictions or ["EU (AI Act, GDPR, PSD2)"],
+                "org_id": current_user.org_id,
+                "evaluated_by": current_user.email,
+                "role": current_user.role.value
             }
 
-            # Commit to immutable PostgreSQL SHA-256 ledger
+            # Commit to immutable PostgreSQL SHA-256 ledger scoped to tenant's org_id
             model_provenance = f"STREAMING_API ({os.getenv('GEMINI_MODEL', 'gemini-3.6-flash')})"
             ledger_receipt = append_compliance_record(
                 user_query=request.query.strip(),
                 payload=audit_payload,
-                model_provenance=model_provenance
+                model_provenance=model_provenance,
+                org_id=current_user.org_id
             )
-            save_compliance_record(request.query.strip(), audit_payload)
+            save_compliance_record(
+                user_query=request.query.strip(),
+                result_dict=audit_payload,
+                org_id=current_user.org_id
+            )
 
             done_event = {
                 "type": "done",
                 "audit_id": ledger_receipt["audit_id"] if ledger_receipt else str(uuid.uuid4()),
+                "org_id": current_user.org_id,
                 "tx_hash": ledger_receipt["tx_hash"] if ledger_receipt else "LOCAL_UNCOMMITTED",
                 "prev_hash": ledger_receipt["prev_hash"] if ledger_receipt else "0" * 64,
                 "timestamp": ledger_receipt["timestamp"] if ledger_receipt else "",
@@ -208,33 +228,46 @@ async def evaluate_architecture(request: EvaluateRequest):
     )
 
 
-
 @router.post(
     "/api/v1/override",
     response_model=OverrideResponse,
     status_code=status.HTTP_200_OK,
-    summary="Human-in-the-Loop Ledger Dispute Override",
+    summary="Human-in-the-Loop Ledger Dispute Override (RBAC Protected)",
     description=(
         "Appends a new dispute override block linked to the latest transaction hash in the "
-        "immutable SHA-256 PostgreSQL ledger without mutating historical blocks."
+        "organization's immutable SHA-256 PostgreSQL ledger. "
+        "Access is restricted to MANAGER and MASTER_ADMIN roles (DEVELOPER returns 403 Forbidden)."
     )
 )
-async def override_judgment(request: OverrideRequest):
+async def override_judgment(
+    request: OverrideRequest,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    # Strict RBAC Constraint: DEVELOPER role cannot perform manual overrides
+    if current_user.role == UserRole.DEVELOPER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied: Users with DEVELOPER role are unauthorized to perform manual compliance overrides. Requires MANAGER or MASTER_ADMIN role."
+        )
+
     try:
         override_receipt = override_ledger_record(
             audit_id=request.audit_id.strip(),
-            justification=request.justification.strip()
+            justification=request.justification.strip(),
+            org_id=current_user.org_id,
+            operator_email=current_user.email
         )
 
         if not override_receipt:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to append dispute override block to PostgreSQL ledger."
+                detail="Failed to append dispute override block to organization ledger."
             )
 
         return OverrideResponse(
             audit_id=override_receipt["audit_id"],
             original_audit_id=override_receipt["original_audit_id"],
+            org_id=override_receipt.get("org_id", current_user.org_id),
             timestamp=override_receipt["timestamp"],
             model_provenance=override_receipt["model_provenance"],
             prev_hash=override_receipt["prev_hash"],
@@ -260,14 +293,18 @@ async def override_judgment(request: OverrideRequest):
 @router.get(
     "/api/v1/ledger",
     status_code=status.HTTP_200_OK,
-    summary="Fetch Recent Ledger Blocks",
-    description="Retrieves the most recent cryptographic ledger blocks from PostgreSQL for compliance audit ledger inspection."
+    summary="Fetch Recent Organization Ledger Blocks (Authenticated)",
+    description="Retrieves the most recent cryptographic ledger blocks from PostgreSQL for the user's organization with row-level data isolation."
 )
-async def get_ledger_blocks(limit: int = Query(default=10, ge=1, le=100)):
+async def get_ledger_blocks(
+    limit: int = Query(default=10, ge=1, le=100),
+    current_user: CurrentUser = Depends(get_current_user)
+):
     try:
-        blocks = get_recent_ledger_blocks(limit=limit)
-        is_valid, count, error_msg = verify_ledger_chain()
+        blocks = get_recent_ledger_blocks(org_id=current_user.org_id, limit=limit)
+        is_valid, count, error_msg = verify_ledger_chain(org_id=current_user.org_id)
         return {
+            "org_id": current_user.org_id,
             "total": len(blocks),
             "chain_valid": is_valid,
             "total_blocks_verified": count,
@@ -282,7 +319,7 @@ async def get_ledger_blocks(limit: int = Query(default=10, ge=1, le=100)):
 
 
 # =====================================================================
-# 3. CI/CD Automated Webhook & Legacy Routes
+# 3. CI/CD Automated Webhook Routes
 # =====================================================================
 
 @router.post(
@@ -296,7 +333,10 @@ async def get_ledger_blocks(limit: int = Query(default=10, ge=1, le=100)):
     summary="CI/CD Automated Architecture Audit Webhook",
     description="GitHub Action webhook returning 200 for compliant architectures and 403 to block CI/CD if non-compliant."
 )
-async def scan_repo_webhook(payload: WebhookPayload):
+async def scan_repo_webhook(
+    payload: WebhookPayload,
+    current_user: CurrentUser = Depends(get_current_user)
+):
     try:
         result = query_compliance_engine(
             user_query=payload.architecture_changes.strip(),
@@ -309,7 +349,9 @@ async def scan_repo_webhook(payload: WebhookPayload):
                 "repo_name": payload.repo_name,
                 "commit_hash": payload.commit_hash,
                 "jurisdictions": payload.jurisdictions or ["EU (Default)"],
-                "source": "GITHUB_ACTIONS_WEBHOOK"
+                "source": "GITHUB_ACTIONS_WEBHOOK",
+                "org_id": current_user.org_id,
+                "triggered_by": current_user.email
             }
         }
 
@@ -319,10 +361,11 @@ async def scan_repo_webhook(payload: WebhookPayload):
         ledger_receipt = append_compliance_record(
             user_query=audit_query_label,
             payload=audit_payload,
-            model_provenance=model_provenance
+            model_provenance=model_provenance,
+            org_id=current_user.org_id
         )
 
-        save_compliance_record(audit_query_label, audit_payload)
+        save_compliance_record(audit_query_label, audit_payload, org_id=current_user.org_id)
 
         audit_id = ledger_receipt["audit_id"] if ledger_receipt else "LOCAL_SESSION_ONLY"
         tx_hash = ledger_receipt["tx_hash"] if ledger_receipt else "NO_TX_HASH"
@@ -331,6 +374,7 @@ async def scan_repo_webhook(payload: WebhookPayload):
 
         response_body = {
             "audit_id": audit_id,
+            "org_id": current_user.org_id,
             "is_compliant": is_compliant,
             "tx_hash": tx_hash,
             "repo_name": payload.repo_name,
@@ -364,5 +408,6 @@ async def scan_repo_webhook(payload: WebhookPayload):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Automated compliance evaluation failed: {str(e)}"
         )
+
 
 
