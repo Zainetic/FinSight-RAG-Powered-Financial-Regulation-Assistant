@@ -1,11 +1,12 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+
 from src.core.database import init_db
 from src.core.ledger import init_ledger_table
 from src.api.routes import router as compliance_router
 from src.api.auth import router as auth_router
-import re
 
 
 @asynccontextmanager
@@ -26,15 +27,18 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Allow local development and any Vercel deployment preview/production domain
+# 1. Handle Render's HTTPS Proxy Headers to prevent request hangs
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
+# 2. Allow local development and exact production URL
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://finsight.vercel.app",
 ]
 
-# Regex to automatically whitelist any Vercel preview branch for this project
-origin_regex = r"https://finsight(-[a-zA-Z0-9-]+)?-zain-130c\.vercel\.app"
+# 3. Bulletproof Regex for ANY Vercel Preview URL
+origin_regex = r"https://.*\.vercel\.app"
 
 app.add_middleware(
     CORSMiddleware,
@@ -62,4 +66,3 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("src.api.main:app", host="0.0.0.0", port=8000, reload=True)
-
