@@ -216,7 +216,7 @@ export default function ComplianceDashboard() {
   // Submit Architecture for Streaming Evaluation
   const handleEvaluate = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!query.trim() || !token) return;
+    if (!query.trim() || !token || isLoading) return;
 
     setIsLoading(true);
     setErrorMessage(null);
@@ -347,7 +347,7 @@ export default function ComplianceDashboard() {
 
   // Submit Human Override
   const handleOverride = async () => {
-    if (!result?.audit_id || !justification.trim() || !token) return;
+    if (!result?.audit_id || !justification.trim() || !token || isOverriding) return;
 
     setIsOverriding(true);
     setOverrideError(null);
@@ -421,7 +421,7 @@ export default function ComplianceDashboard() {
       </div>
 
       {/* Frosted Glass Navigation Bar */}
-      <header className="border-b border-white/10 bg-white/[0.02] backdrop-blur-2xl sticky top-0 z-40 transition-all">
+      <header className="border-b border-white/10 bg-white/[0.02] backdrop-blur-2xl sticky top-0 z-40 transition-all duration-200">
         <div className="max-w-6xl mx-auto px-6 sm:px-8 h-20 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="h-11 w-11 rounded-2xl bg-white/[0.08] border border-white/15 p-0.5 flex items-center justify-center shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] backdrop-blur-xl">
@@ -467,7 +467,7 @@ export default function ComplianceDashboard() {
             {user?.role === "MASTER_ADMIN" && (
               <Link
                 href="/admin"
-                className="text-xs px-3.5 py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border border-purple-500/20 backdrop-blur-xl transition-all flex items-center space-x-1.5 shadow-[0_4px_20px_0_rgba(0,0,0,0.2)] active:scale-95"
+                className="text-xs px-3.5 py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border border-purple-500/20 backdrop-blur-xl transition-all duration-200 ease-out flex items-center space-x-1.5 shadow-[0_4px_20px_0_rgba(0,0,0,0.2)] active:scale-95"
               >
                 <span>👥</span>
                 <span className="font-medium">Team Mgmt</span>
@@ -476,7 +476,7 @@ export default function ComplianceDashboard() {
 
             <button
               onClick={fetchLedgerHistory}
-              className="text-xs px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-white/80 hover:text-white border border-white/15 backdrop-blur-xl transition-all flex items-center space-x-2 shadow-[0_4px_20px_0_rgba(0,0,0,0.2)] active:scale-95"
+              className="text-xs px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-white/80 hover:text-white border border-white/15 backdrop-blur-xl transition-all duration-200 ease-out flex items-center space-x-2 shadow-[0_4px_20px_0_rgba(0,0,0,0.2)] active:scale-95"
             >
               <span>⛓️</span>
               <span className="font-medium">Ledger Explorer</span>
@@ -484,7 +484,7 @@ export default function ComplianceDashboard() {
 
             <button
               onClick={logout}
-              className="text-xs px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 backdrop-blur-xl transition-all active:scale-95"
+              className="text-xs px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 backdrop-blur-xl transition-all duration-200 ease-out active:scale-95"
             >
               Sign Out
             </button>
@@ -493,7 +493,7 @@ export default function ComplianceDashboard() {
       </header>
 
       {/* Main Single-Column Flowing Canvas */}
-      <main className="max-w-5xl mx-auto px-6 sm:px-8 py-16 flex-1 w-full space-y-16 relative z-10">
+      <main className="max-w-5xl mx-auto px-6 sm:px-8 py-14 flex-1 w-full space-y-14 relative z-10">
         {/* Hero Banner */}
         <section className="text-center space-y-4 max-w-3xl mx-auto">
           <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-white/70 backdrop-blur-xl shadow-inner">
@@ -510,7 +510,7 @@ export default function ComplianceDashboard() {
         </section>
 
         {/* Section A: The Architectural Input */}
-        <section className="bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[2.5rem] p-8 sm:p-12 space-y-8 relative overflow-hidden transition-all">
+        <section className="bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[2.5rem] p-8 sm:p-12 space-y-8 relative overflow-hidden transition-all duration-200">
           <div className="space-y-2">
             <h2 className="text-2xl sm:text-3xl font-light text-white/95 tracking-tight flex items-center space-x-3">
               <span>🏛️</span>
@@ -531,7 +531,7 @@ export default function ComplianceDashboard() {
                 <button
                   key={idx}
                   onClick={() => setQuery(preset.query)}
-                  className="text-xs px-4 py-2.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.09] border border-white/10 text-white/80 hover:text-white transition-all text-left backdrop-blur-md active:scale-95 shadow-sm"
+                  className="text-xs px-4 py-2.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.10] border border-white/10 hover:border-white/20 text-white/80 hover:text-white transition-all duration-200 ease-out text-left backdrop-blur-md active:scale-95 shadow-sm"
                 >
                   <span className="text-indigo-400 font-mono mr-1.5 font-bold">[{idx + 1}]</span>
                   {preset.title}
@@ -548,7 +548,7 @@ export default function ComplianceDashboard() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="e.g., We are building a payment gateway that categorizes users based on biometric facial recognition for instant loan approval..."
-                className="w-full bg-black/30 border border-white/10 rounded-3xl p-6 text-sm sm:text-base text-white/90 placeholder-white/30 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 backdrop-blur-md transition-all resize-y leading-relaxed font-light shadow-inner"
+                className="w-full bg-black/30 border border-white/10 rounded-3xl p-6 text-sm sm:text-base text-white/90 placeholder-white/30 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md transition-all duration-200 ease-out resize-y leading-relaxed font-light shadow-inner"
               />
             </div>
 
@@ -565,10 +565,10 @@ export default function ComplianceDashboard() {
                       type="button"
                       key={j.id}
                       onClick={() => toggleJurisdiction(j.id)}
-                      className={`p-4 rounded-2xl border text-left transition-all backdrop-blur-md flex flex-col justify-between ${
+                      className={`p-4 rounded-2xl border text-left transition-all duration-200 ease-out backdrop-blur-md flex flex-col justify-between active:scale-95 ${
                         isSelected
                           ? "bg-indigo-500/15 border-indigo-500/40 text-white shadow-[0_0_20px_0_rgba(99,102,241,0.15)]"
-                          : "bg-white/[0.02] border-white/5 text-white/50 hover:border-white/15"
+                          : "bg-white/[0.02] border-white/5 text-white/50 hover:border-white/15 hover:text-white/80"
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
@@ -587,12 +587,12 @@ export default function ComplianceDashboard() {
               <button
                 type="submit"
                 disabled={isLoading || !query.trim()}
-                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white hover:bg-white/90 text-slate-950 font-medium text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center space-x-3 shadow-[0_4px_20px_0_rgba(255,255,255,0.2)] active:scale-[0.98]"
+                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white hover:bg-white/90 text-slate-950 font-medium text-sm transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 shadow-[0_4px_20px_0_rgba(255,255,255,0.2)] active:scale-95"
               >
                 {isLoading ? (
                   <>
                     <span className="inline-block animate-spin">⏳</span>
-                    <span>Streaming Compliance Assessment...</span>
+                    <span>Processing Compliance Evaluation...</span>
                   </>
                 ) : (
                   <>
@@ -605,7 +605,7 @@ export default function ComplianceDashboard() {
           </form>
 
           {errorMessage && (
-            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center space-x-3">
+            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center space-x-3 animate-in fade-in duration-200">
               <span>⚠️</span>
               <span>{errorMessage}</span>
             </div>
@@ -614,7 +614,7 @@ export default function ComplianceDashboard() {
 
         {/* Section B: The Compliance Evaluation Results Canvas */}
         {result && (
-          <div className="space-y-12 animate-in fade-in duration-500">
+          <div className="space-y-12 animate-in fade-in duration-300">
             {/* 1. High-Impact Status Hero Metric Banner */}
             <section className="bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[2.5rem] p-8 sm:p-12 flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative overflow-hidden">
               <div className="space-y-2">
@@ -672,7 +672,7 @@ export default function ComplianceDashboard() {
                   </div>
                   <button
                     onClick={() => copyToClipboard(result.audit_id, "audit_id")}
-                    className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white/80 rounded-lg text-[10px] font-sans border border-white/10 transition-all active:scale-95"
+                    className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white/80 rounded-lg text-[10px] font-sans border border-white/10 transition-all duration-200 ease-out active:scale-95"
                   >
                     {copiedKey === "audit_id" ? "Copied!" : "Copy"}
                   </button>
@@ -686,7 +686,7 @@ export default function ComplianceDashboard() {
                   </div>
                   <button
                     onClick={() => copyToClipboard(result.tx_hash, "tx_hash")}
-                    className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white/80 rounded-lg text-[10px] font-sans border border-white/10 transition-all active:scale-95"
+                    className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white/80 rounded-lg text-[10px] font-sans border border-white/10 transition-all duration-200 ease-out active:scale-95"
                   >
                     {copiedKey === "tx_hash" ? "Copied!" : "Copy"}
                   </button>
@@ -700,7 +700,7 @@ export default function ComplianceDashboard() {
                   </div>
                   <button
                     onClick={() => copyToClipboard(result.prev_hash, "prev_hash")}
-                    className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white/80 rounded-lg text-[10px] font-sans border border-white/10 transition-all active:scale-95"
+                    className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white/80 rounded-lg text-[10px] font-sans border border-white/10 transition-all duration-200 ease-out active:scale-95"
                   >
                     {copiedKey === "prev_hash" ? "Copied!" : "Copy"}
                   </button>
@@ -751,7 +751,7 @@ export default function ComplianceDashboard() {
                   {result.citations.map((cit, idx) => (
                     <div
                       key={idx}
-                      className="bg-black/30 p-6 rounded-3xl border border-white/5 space-y-3 backdrop-blur-md"
+                      className="bg-black/30 p-6 rounded-3xl border border-white/5 space-y-3 backdrop-blur-md transition-all duration-200 hover:border-white/15"
                     >
                       <div className="flex items-center justify-between text-indigo-300 font-medium text-sm">
                         <span>
@@ -790,7 +790,7 @@ export default function ComplianceDashboard() {
                 </div>
 
                 {overrideResult ? (
-                  <div className="p-6 rounded-3xl bg-amber-500/[0.08] border border-amber-500/25 space-y-3 text-sm backdrop-blur-md">
+                  <div className="p-6 rounded-3xl bg-amber-500/[0.08] border border-amber-500/25 space-y-3 text-sm backdrop-blur-md animate-in fade-in duration-200">
                     <div className="font-medium text-amber-300 flex items-center space-x-2 text-base">
                       <span>✅</span>
                       <span>Dispute Override Permanently Committed to Cryptographic Ledger!</span>
@@ -817,18 +817,21 @@ export default function ComplianceDashboard() {
                       value={justification}
                       onChange={(e) => setJustification(e.target.value)}
                       placeholder="Enter legal justification for override (e.g., Processing falls under GDPR Art. 9(2)(a) explicit consent with localized on-device processing)..."
-                      className="w-full bg-black/30 border border-white/10 rounded-2xl p-4 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 backdrop-blur-md leading-relaxed"
+                      className="w-full bg-black/30 border border-white/10 rounded-2xl p-4 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md leading-relaxed transition-all duration-200 ease-out"
                     />
                     {overrideError && (
-                      <div className="text-xs text-rose-400">{overrideError}</div>
+                      <div className="text-xs text-rose-400 animate-in fade-in duration-200">{overrideError}</div>
                     )}
                     <button
                       onClick={handleOverride}
                       disabled={isOverriding || !justification.trim() || isLoading}
-                      className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold rounded-xl text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-2 active:scale-95 shadow-md shadow-amber-500/20"
+                      className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold rounded-xl text-sm transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 active:scale-95 shadow-md shadow-amber-500/20"
                     >
                       {isOverriding ? (
-                        <span>Committing Override Block...</span>
+                        <>
+                          <span className="inline-block animate-spin">⏳</span>
+                          <span>Committing Override Block...</span>
+                        </>
                       ) : (
                         <>
                           <span>🧑‍⚖️</span>
@@ -844,14 +847,14 @@ export default function ComplianceDashboard() {
         )}
       </main>
 
-      {/* Redesigned Apple Liquid Glass Ledger History Modal */}
+      {/* Redesigned Elevated Apple Liquid Glass Ledger History Modal */}
       {showLedgerModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-2xl z-50 flex items-center justify-center p-4 sm:p-6 transition-all animate-in fade-in duration-200">
-          <div className="bg-black/40 backdrop-blur-3xl border border-white/15 rounded-[2.5rem] max-w-4xl w-full max-h-[88vh] flex flex-col shadow-[0_24px_64px_0_rgba(0,0,0,0.6)] overflow-hidden relative">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-2xl z-50 flex items-center justify-center p-4 sm:p-6 transition-all duration-200 ease-out animate-in fade-in">
+          <div className="bg-[#0b0c10]/95 backdrop-blur-3xl border border-white/20 rounded-[2.5rem] max-w-4xl w-full max-h-[88vh] flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.8),0_24px_80px_rgba(0,0,0,0.9)] overflow-hidden relative z-50">
             {/* Modal Header */}
-            <div className="px-8 py-6 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
+            <div className="px-8 py-6 border-b border-white/10 flex items-center justify-between bg-white/[0.03]">
               <div className="flex items-center space-x-3.5">
-                <div className="h-10 w-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-lg shadow-inner">
+                <div className="h-11 w-11 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-lg shadow-inner">
                   ⛓️
                 </div>
                 <div>
@@ -865,7 +868,7 @@ export default function ComplianceDashboard() {
               </div>
               <button
                 onClick={() => setShowLedgerModal(false)}
-                className="text-white/40 hover:text-white text-sm h-9 w-9 rounded-2xl hover:bg-white/10 border border-white/5 transition-all flex items-center justify-center active:scale-90"
+                className="text-white/50 hover:text-white text-sm h-9 w-9 rounded-2xl hover:bg-white/10 border border-white/10 transition-all duration-200 ease-out flex items-center justify-center active:scale-90"
               >
                 ✕
               </button>
@@ -883,7 +886,7 @@ export default function ComplianceDashboard() {
               {ledgerData && (
                 <>
                   {/* Ledger Authenticity Metric Bar */}
-                  <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-md">
+                  <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white/[0.04] border border-white/15 backdrop-blur-md shadow-inner">
                     <div className="flex items-center space-x-4">
                       <div>
                         <span className="text-white/40 text-[10px] uppercase tracking-wider block font-sans">
@@ -899,13 +902,13 @@ export default function ComplianceDashboard() {
                           Chain Verification
                         </span>
                         {ledgerData.chain_valid ? (
-                          <span className="text-emerald-400 font-semibold text-sm flex items-center space-x-1">
-                            <span>✓</span>
+                          <span className="text-emerald-400 font-semibold text-sm flex items-center space-x-1.5">
+                            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
                             <span>Valid Cryptographic Chain</span>
                           </span>
                         ) : (
-                          <span className="text-rose-400 font-semibold text-sm flex items-center space-x-1">
-                            <span>⚠</span>
+                          <span className="text-rose-400 font-semibold text-sm flex items-center space-x-1.5">
+                            <span className="h-2 w-2 rounded-full bg-rose-400 animate-pulse"></span>
                             <span>Tampering / Fork Detected</span>
                           </span>
                         )}
@@ -913,26 +916,26 @@ export default function ComplianceDashboard() {
                     </div>
                     <button
                       onClick={fetchLedgerHistory}
-                      className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs transition-all active:scale-95 font-sans"
+                      className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs transition-all duration-200 ease-out active:scale-95 font-sans border border-white/10"
                     >
                       Re-verify Chain
                     </button>
                   </div>
 
-                  {/* Visual Blockchain Flow */}
+                  {/* Visual Blockchain Flow with High Contrast & Hover Elevation */}
                   <div className="space-y-4">
                     {ledgerData.blocks.map((block, idx) => (
                       <div
                         key={block.audit_id}
-                        className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 space-y-3.5 hover:border-white/20 transition-all backdrop-blur-md"
+                        className="bg-white/[0.04] hover:bg-white/[0.10] border border-white/10 hover:border-white/25 rounded-2xl p-5 space-y-3.5 transition-all duration-200 ease-out backdrop-blur-md cursor-pointer group shadow-sm"
                       >
                         {/* Block Header */}
                         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-3">
                           <div className="flex items-center space-x-2.5">
-                            <span className="h-6 w-6 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-mono text-[10px] flex items-center justify-center font-bold">
+                            <span className="h-6 w-6 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 font-mono text-[10px] flex items-center justify-center font-bold shadow-inner">
                               #{ledgerData.total - idx}
                             </span>
-                            <span className="text-white/90 font-medium text-xs truncate max-w-sm sm:max-w-md font-sans">
+                            <span className="text-white/95 font-medium text-xs truncate max-w-sm sm:max-w-md font-sans group-hover:text-white transition-colors">
                               {block.user_query}
                             </span>
                           </div>
@@ -946,29 +949,35 @@ export default function ComplianceDashboard() {
 
                         {/* Cryptographic Linkage Info */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
-                          <div className="bg-black/40 p-2.5 rounded-xl border border-white/5 flex items-center justify-between">
+                          <div className="bg-black/60 group-hover:bg-black/80 p-2.5 rounded-xl border border-white/5 group-hover:border-white/15 flex items-center justify-between transition-all duration-200">
                             <div className="truncate mr-2">
                               <span className="text-indigo-400 block text-[9px] uppercase font-sans font-medium">Tx Hash</span>
-                              <span className="text-indigo-200">{truncateHash(block.tx_hash)}</span>
+                              <span className="text-indigo-200 font-semibold">{truncateHash(block.tx_hash)}</span>
                             </div>
                             <button
-                              onClick={() => copyToClipboard(block.tx_hash, `modal_tx_${idx}`)}
-                              className="text-[10px] text-white/50 hover:text-white px-2 py-0.5 rounded bg-white/5"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyToClipboard(block.tx_hash, `modal_tx_${idx}`);
+                              }}
+                              className="text-[10px] text-white/60 hover:text-white px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 transition-all duration-200 active:scale-90 font-sans"
                             >
-                              {copiedKey === `modal_tx_${idx}` ? "Copied" : "Copy"}
+                              {copiedKey === `modal_tx_${idx}` ? "Copied!" : "Copy"}
                             </button>
                           </div>
 
-                          <div className="bg-black/40 p-2.5 rounded-xl border border-white/5 flex items-center justify-between">
+                          <div className="bg-black/60 group-hover:bg-black/80 p-2.5 rounded-xl border border-white/5 group-hover:border-white/15 flex items-center justify-between transition-all duration-200">
                             <div className="truncate mr-2">
                               <span className="text-white/40 block text-[9px] uppercase font-sans font-medium">Prev Hash</span>
                               <span className="text-white/60">{truncateHash(block.prev_hash)}</span>
                             </div>
                             <button
-                              onClick={() => copyToClipboard(block.prev_hash, `modal_prev_${idx}`)}
-                              className="text-[10px] text-white/50 hover:text-white px-2 py-0.5 rounded bg-white/5"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyToClipboard(block.prev_hash, `modal_prev_${idx}`);
+                              }}
+                              className="text-[10px] text-white/60 hover:text-white px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 transition-all duration-200 active:scale-90 font-sans"
                             >
-                              {copiedKey === `modal_prev_${idx}` ? "Copied" : "Copy"}
+                              {copiedKey === `modal_prev_${idx}` ? "Copied!" : "Copy"}
                             </button>
                           </div>
                         </div>
