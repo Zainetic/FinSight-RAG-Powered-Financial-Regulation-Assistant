@@ -5,9 +5,8 @@ from enum import Enum
 from typing import Optional, List, Dict, Any
 
 from pydantic import BaseModel, EmailStr, Field
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from passlib.context import CryptContext
 from dotenv import load_dotenv
 
 # Try importing python-jose or PyJWT
@@ -30,8 +29,9 @@ JWT_SECRET_KEY = os.getenv(
 )
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # 24 Hours default
+AUTH_COOKIE_NAME = "finsight_access_token"
 
-# Password Hashing Context
+# Optional bearer dependency so we can check both cookies and headers
 security_bearer = HTTPBearer(auto_error=False)
 
 
@@ -84,9 +84,44 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
 
 
+# =====================================================================
+# 4. HttpOnly Session Cookie Utilities
+# =====================================================================
+
+def set_auth_cookie(
+    response: Response,
+    token: str,
+    max_age_seconds: int = 1440 * 60,
+    secure: bool = False
+) -> None:
+    """
+    Sets a tamper-proof HttpOnly session cookie on the outgoing HTTP response.
+    In production environments, 'secure' should be True to enforce HTTPS.
+    """
+    # If ENV is production or SECURE_COOKIES=1, force secure=True
+    is_prod = os.getenv("ENV", "development").lower() == "production" or os.getenv("SECURE_COOKIES", "0") == "1"
+    response.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value=token,
+        max_age=max_age_seconds,
+        expires=max_age_seconds,
+        httponly=True,
+        secure=secure or is_prod,
+        samesite="lax",
+        path="/"
+    )
+
+
+def clear_auth_cookie(response: Response) -> None:
+    """Deletes the HttpOnly session cookie from the client browser."""
+    response.delete_cookie(
+        key=AUTH_COOKIE_NAME,
+        path="/"
+    )
+
 
 # =====================================================================
-# 4. JWT Generation and Decoding
+# 5. JWT Generation and Decoding
 # =====================================================================
 
 def create_access_token(
@@ -138,31 +173,40 @@ def decode_access_token(token: str) -> Dict[str, Any]:
 
 
 # =====================================================================
-# 5. FastAPI Security Dependencies
+# 6. FastAPI Security Dependencies (Header + HttpOnly Cookie)
 # =====================================================================
 
 async def get_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer)
 ) -> CurrentUser:
     """
-    FastAPI dependency that validates the Bearer JWT token from the Authorization header
-    and returns a CurrentUser context.
+    FastAPI dependency that validates the JWT token from either:
+    1. The 'Authorization: Bearer <token>' header, OR
+    2. The 'finsight_access_token' HttpOnly cookie
+    and returns a CurrentUser multi-tenant context.
     """
-    if credentials is None or not credentials.credentials:
+    raw_token: Optional[str] = None
+
+    # 1. First priority: Authorization header
+    if credentials and credentials.credentials:
+        if credentials.scheme.lower() == "bearer":
+            raw_token = credentials.credentials
+
+    # 2. Second priority: HttpOnly Cookie fallback
+    if not raw_token:
+        cookie_token = request.cookies.get(AUTH_COOKIE_NAME)
+        if cookie_token:
+            raw_token = cookie_token
+
+    if not raw_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing Authorization Header. Please authenticate with 'Bearer <token>'.",
+            detail="Missing authentication credentials. Please authenticate via Bearer token or HttpOnly session cookie.",
             headers={"WWW-Authenticate": "Bearer"}
         )
 
-    if credentials.scheme.lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication scheme. 'Bearer' scheme is required.",
-            headers={"WWW-Authenticate": "Bearer"}
-        )
-
-    payload = decode_access_token(credentials.credentials)
+    payload = decode_access_token(raw_token)
 
     user_id = payload.get("id") or payload.get("sub")
     org_id = payload.get("org_id")

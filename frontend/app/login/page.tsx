@@ -25,6 +25,7 @@ export default function LoginPage() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await fetch(`${apiUrl}/api/v1/auth/login`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: email.trim(),
@@ -66,6 +67,7 @@ export default function LoginPage() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await fetch(`${apiUrl}/api/v1/auth/login`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: demoEmail,
@@ -83,6 +85,7 @@ export default function LoginPage() {
       router.push("/");
     } catch (err: unknown) {
       const message =
+
         err instanceof Error
           ? err.message
           : "Failed to connect to authentication server.";

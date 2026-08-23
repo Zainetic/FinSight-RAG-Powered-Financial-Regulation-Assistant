@@ -23,6 +23,8 @@ bcrypt
 python-jose[cryptography]
 PyJWT
 email-validator
+slowapi
+
 
 # --- Database ---
 psycopg2-binary

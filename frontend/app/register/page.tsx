@@ -37,6 +37,7 @@ export default function RegisterPage() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await fetch(`${apiUrl}/api/v1/auth/register-org`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           org_name: orgName.trim(),
@@ -46,6 +47,7 @@ export default function RegisterPage() {
       });
 
       const data = await res.json().catch(() => ({}));
+
 
       if (!res.ok) {
         throw new Error(data.detail || `Registration failed (${res.status})`);

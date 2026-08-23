@@ -19,7 +19,7 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (token: string, user: User) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(JSON.parse(storedUser));
       }
     } catch (e) {
-      console.error("Failed to restore auth session from localStorage:", e);
+      console.error("Failed to restore auth session from storage:", e);
     } finally {
       setIsLoading(false);
     }
@@ -56,12 +56,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(newToken);
       setUser(newUser);
     } catch (e) {
-      console.error("Failed to save auth session to localStorage:", e);
+      console.error("Failed to save auth session to storage:", e);
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      // Clear server-side HttpOnly session cookie
+      await fetch(`${apiUrl}/api/v1/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      }).catch(() => {});
+
       localStorage.removeItem(AUTH_STORAGE_KEY);
       localStorage.removeItem(USER_STORAGE_KEY);
       setToken(null);

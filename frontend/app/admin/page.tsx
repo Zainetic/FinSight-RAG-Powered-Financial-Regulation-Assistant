@@ -45,6 +45,7 @@ export default function AdminPage() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await fetch(`${apiUrl}/api/v1/auth/users`, {
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -79,6 +80,7 @@ export default function AdminPage() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await fetch(`${apiUrl}/api/v1/auth/create-user`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -91,6 +93,7 @@ export default function AdminPage() {
       });
 
       const data = await res.json().catch(() => ({}));
+
 
       if (!res.ok) {
         throw new Error(data.detail || `Failed to create user (${res.status})`);

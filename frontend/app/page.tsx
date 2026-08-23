@@ -239,6 +239,7 @@ export default function ComplianceDashboard() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await fetch(`${apiUrl}/api/v1/evaluate`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -357,6 +358,7 @@ export default function ComplianceDashboard() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await fetch(`${apiUrl}/api/v1/override`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -391,6 +393,7 @@ export default function ComplianceDashboard() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await fetch(`${apiUrl}/api/v1/ledger?limit=10`, {
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -405,6 +408,7 @@ export default function ComplianceDashboard() {
       setIsLoadingLedger(false);
     }
   };
+
 
 
   if (isAuthLoading || !isAuthenticated) {
