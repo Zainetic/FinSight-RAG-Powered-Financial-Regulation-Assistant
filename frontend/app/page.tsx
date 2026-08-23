@@ -471,6 +471,16 @@ export default function ComplianceDashboard() {
               )}
             </div>
 
+            {/* Live Simulator Link */}
+            <Link
+              href="/simulator"
+              className="text-xs px-3.5 py-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-200 border border-indigo-500/25 backdrop-blur-xl transition-all duration-200 ease-out flex items-center space-x-1.5 shadow-[0_4px_20px_0_rgba(99,102,241,0.15)] active:scale-95 group"
+              title="Automated Transaction Gatekeeper Simulator"
+            >
+              <span className="text-indigo-400 group-hover:scale-110 transition-transform">⚡</span>
+              <span className="font-medium">Live Simulator</span>
+            </Link>
+
             {/* Admin Team Mgmt Link (Master Admin Only) */}
             {user?.role === "MASTER_ADMIN" && (
               <Link
@@ -500,10 +510,11 @@ export default function ComplianceDashboard() {
         </div>
       </header>
 
+
       {/* Main Single-Column Flowing Canvas */}
       <main className="max-w-5xl mx-auto px-6 sm:px-8 py-14 flex-1 w-full space-y-14 relative z-10">
         {/* Hero Banner */}
-        <section className="text-center space-y-4 max-w-3xl mx-auto">
+        <section className="text-center space-y-5 max-w-3xl mx-auto">
           <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-white/70 backdrop-blur-xl shadow-inner">
             <span>⚡</span>
             <span>Real-Time SSE Streaming Compliance Engine</span>
@@ -515,10 +526,30 @@ export default function ComplianceDashboard() {
           <p className="text-sm sm:text-base text-white/60 font-light max-w-2xl mx-auto leading-relaxed">
             Instant streaming evaluation against the EU AI Act, GDPR, and PSD2 with SHA-256 immutable ledger audit tracking.
           </p>
+
+          {/* Primary & Secondary Hero CTAs */}
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <a
+              href="#architectural-evaluator"
+              className="px-6 py-3.5 rounded-2xl bg-white hover:bg-white/90 text-slate-950 font-medium text-xs sm:text-sm transition-all duration-200 ease-out flex items-center space-x-2 shadow-[0_4px_20px_0_rgba(255,255,255,0.2)] active:scale-95"
+            >
+              <span>🏛️</span>
+              <span>Evaluate Architecture</span>
+              <span>&darr;</span>
+            </a>
+            <Link
+              href="/simulator"
+              className="px-6 py-3.5 rounded-2xl bg-white/[0.06] hover:bg-white/[0.12] text-white border border-white/15 backdrop-blur-xl transition-all duration-200 ease-out flex items-center space-x-2 shadow-[0_4px_20px_0_rgba(0,0,0,0.2)] active:scale-95 hover:border-indigo-500/40 group"
+            >
+              <span className="text-indigo-400 group-hover:scale-110 transition-transform">⚡</span>
+              <span className="font-medium text-xs sm:text-sm">Test Transaction API ⚡</span>
+            </Link>
+          </div>
         </section>
 
         {/* Section A: The Architectural Input */}
-        <section className="bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[2.5rem] p-8 sm:p-12 space-y-8 relative overflow-hidden transition-all duration-200">
+        <section id="architectural-evaluator" className="bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[2.5rem] p-8 sm:p-12 space-y-8 relative overflow-hidden transition-all duration-200 scroll-mt-28">
+
           <div className="space-y-2">
             <h2 className="text-2xl sm:text-3xl font-light text-white/95 tracking-tight flex items-center space-x-3">
               <span>🏛️</span>
