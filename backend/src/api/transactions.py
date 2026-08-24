@@ -1,14 +1,19 @@
 """
 FinSight RegTech - Automated Transaction Gatekeeper API
-Machine-to-Machine Financial Compliance, Sanctions Screening, Zero-Trust PII Scrubbing, and SHA-256 Audit Anchoring.
+Machine-to-Machine Financial Compliance, Sanctions Screening, Zero-Trust PII Scrubbing, SHA-256 Audit Anchoring,
+and Persistent PostgreSQL Transaction Ledger Storage.
 """
 
 import json
 import hashlib
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Literal
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.core.database import get_db
+from src.core.models import TransactionLedger
 
 
 router = APIRouter(prefix="/api/v1/transactions", tags=["Automated Transaction Gatekeeper"])
@@ -174,7 +179,7 @@ def scrub_pii(tx: TransactionPayload) -> ScrubbedPayload:
 
 
 # =====================================================================
-# 3. Gatekeeper Evaluation Endpoint
+# 3. Gatekeeper Evaluation Endpoint (with PostgreSQL Ledger Persistence)
 # =====================================================================
 
 SANCTIONED_COUNTRIES = {"KP", "IR", "SY"}
@@ -188,13 +193,18 @@ HIGH_RISK_JURISDICTIONS = {"KY", "PA", "VG", "BS", "RU"}
     summary="Automated Machine-to-Machine Financial Transaction Gatekeeper",
     description=(
         "Executes zero-trust PII scrubbing, real-time AML/Sanctions rules evaluation, "
+        "persists the immutable evaluation audit into PostgreSQL Transaction Ledger via SQLAlchemy, "
         "and generates a tamper-evident SHA-256 cryptographic audit digest."
     )
 )
-async def evaluate_transaction(payload: TransactionPayload):
+async def evaluate_transaction(
+    payload: TransactionPayload,
+    db: AsyncSession = Depends(get_db)
+):
     # 1. Zero-Trust PII Scrubbing
     scrubbed = scrub_pii(payload)
-    timestamp = datetime.now(timezone.utc).isoformat()
+    now_utc = datetime.now(timezone.utc)
+    timestamp = now_utc.isoformat()
 
     receiver_country = scrubbed.receiver_country
     amount = scrubbed.amount
@@ -239,6 +249,20 @@ async def evaluate_transaction(payload: TransactionPayload):
     }
     canonical_json = json.dumps(hash_payload, sort_keys=True, separators=(",", ":"))
     sha256_audit_hash = hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
+    # 4. Persist Evaluation Audit into PostgreSQL Transaction Ledger via SQLAlchemy
+    new_ledger_entry = TransactionLedger(
+        transaction_id=scrubbed.tx_id,
+        payload_data=scrubbed.model_dump(),
+        verdict=verdict,
+        risk_score=risk_score,
+        rule_triggered=rule_triggered,
+        legal_basis=legal_basis,
+        sha256_hash=sha256_audit_hash,
+        timestamp=now_utc
+    )
+    db.add(new_ledger_entry)
+    await db.commit()
 
     return EvaluationResponse(
         verdict=verdict,
