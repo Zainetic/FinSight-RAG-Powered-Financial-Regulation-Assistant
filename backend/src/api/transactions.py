@@ -7,13 +7,15 @@ and Persistent PostgreSQL Transaction Ledger Storage.
 import json
 import hashlib
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any, Literal
+from typing import Optional, Dict, Any, Literal, List
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.core.models import TransactionLedger
+
 
 
 router = APIRouter(prefix="/api/v1/transactions", tags=["Automated Transaction Gatekeeper"])
@@ -274,3 +276,28 @@ async def evaluate_transaction(
         raw_payload_preview=payload.model_dump(),
         scrubbed_payload_sent_to_engine=scrubbed
     )
+
+
+@router.get(
+    "/ledger",
+    status_code=status.HTTP_200_OK,
+    summary="Fetch Recent Transaction Ledger History",
+    description="Retrieves the most recent 50 evaluated transaction records from the PostgreSQL ledger ordered by timestamp descending."
+)
+async def get_transaction_ledger(
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """
+    Selects the most recent 50 entries from the transaction_ledger table,
+    ordered by timestamp descending.
+    """
+    query = (
+        select(TransactionLedger)
+        .order_by(desc(TransactionLedger.timestamp))
+        .limit(min(limit, 100))
+    )
+    result = await db.execute(query)
+    entries = result.scalars().all()
+    return [entry.to_dict() for entry in entries]
+
