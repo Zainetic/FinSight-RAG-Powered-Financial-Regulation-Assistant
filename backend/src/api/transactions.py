@@ -1,6 +1,7 @@
 """
 FinSight RegTech - Automated Transaction Gatekeeper API
-Machine-to-Machine Financial Compliance, Sanctions Screening, Zero-Trust PII Scrubbing, SHA-256 Audit Anchoring,
+Machine-to-Machine Financial Compliance, Sanctions Screening, Zero-Trust PII Scrubbing,
+FAISS Vector Store Regulatory Retrieval (AMLD6 / EUR-Lex), SHA-256 Audit Anchoring,
 and Persistent PostgreSQL Transaction Ledger Storage.
 """
 
@@ -16,8 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.auth import get_current_user, CurrentUser
 from src.core.database import get_db
 from src.core.models import TransactionLedger
-
-
+from src.core.rag import get_vector_store
 
 
 router = APIRouter(prefix="/api/v1/transactions", tags=["Automated Transaction Gatekeeper"])
@@ -120,8 +120,8 @@ class EvaluationResponse(BaseModel):
     )
     legal_basis: Optional[str] = Field(
         None,
-        description="Statutory legal framework or regulatory citation",
-        example="EU AMLD5 Standard Due Diligence & PSD2 Exemption"
+        description="Statutory legal framework or regulatory citation dynamically retrieved from FAISS EUR-Lex index",
+        example="AMLD6 Article 3 (Money laundering offences) - \"Member States shall take the necessary measures...\""
     )
     sha256_audit_hash: str = Field(
         ...,
@@ -183,7 +183,41 @@ def scrub_pii(tx: TransactionPayload) -> ScrubbedPayload:
 
 
 # =====================================================================
-# 3. Gatekeeper Evaluation Endpoint (with PostgreSQL Ledger Persistence)
+# 3. Dynamic FAISS RAG Statutory Legal Basis Retrieval
+# =====================================================================
+
+def retrieve_statutory_basis(search_query: str, default_fallback: str) -> str:
+    """
+    Performs dynamic RAG similarity search against the FAISS vector database
+    to fetch authentic EUR-Lex statutory text matching the evaluated transaction context.
+    Falls back gracefully without raising exceptions if FAISS is unavailable.
+    """
+    try:
+        vector_store = get_vector_store()
+        if vector_store:
+            docs = vector_store.similarity_search(search_query, k=1)
+            if docs:
+                top_doc = docs[0]
+                source = top_doc.metadata.get("source", "AMLD6")
+                art_num = top_doc.metadata.get("article_number")
+                title = top_doc.metadata.get("title", "")
+
+                # Format clean text snippet from retrieved statutory article
+                clean_content = " ".join(top_doc.page_content.split())
+                snippet = clean_content[:240] + ("..." if len(clean_content) > 240 else "")
+
+                art_header = f"Article {art_num}" if art_num is not None else ""
+                title_suffix = f" ({title})" if title and title != f"Article {art_num}" else ""
+
+                return f"{source} {art_header}{title_suffix} - \"{snippet}\""
+    except Exception as e:
+        print(f"[RAG Gatekeeper Warning] FAISS vector store query failed ({e}). Utilizing fallback legal basis.")
+
+    return default_fallback
+
+
+# =====================================================================
+# 4. Gatekeeper Evaluation Endpoint (with PostgreSQL Ledger Persistence)
 # =====================================================================
 
 SANCTIONED_COUNTRIES = {"KP", "IR", "SY"}
@@ -197,6 +231,7 @@ HIGH_RISK_JURISDICTIONS = {"KY", "PA", "VG", "BS", "RU"}
     summary="Automated Machine-to-Machine Financial Transaction Gatekeeper",
     description=(
         "Executes zero-trust PII scrubbing, real-time AML/Sanctions rules evaluation, "
+        "dynamically retrieves statutory text from FAISS EUR-Lex vector index, "
         "persists the immutable evaluation audit into PostgreSQL Transaction Ledger via SQLAlchemy, "
         "and generates a tamper-evident SHA-256 cryptographic audit digest."
     )
@@ -214,13 +249,16 @@ async def evaluate_transaction(
     amount = scrubbed.amount
     kyc_level = scrubbed.sender_kyc_level
 
-    # 2. Rule Evaluation
+    # 2. Rule Evaluation & Dynamic RAG Legal Basis Retrieval
     # FAIL Condition 1: Sanctions Embargo ({KP, IR, SY}) -> Risk score 99
     if receiver_country in SANCTIONED_COUNTRIES:
         verdict = "FAIL"
         risk_score = 99
         rule_triggered = "FATF High-Risk Jurisdiction - International Sanctions & Total Embargo"
-        legal_basis = "EU Regulation 2024/1624 Art. 29, OFAC Sanctions Regime & FATF Blacklist"
+        legal_basis = retrieve_statutory_basis(
+            search_query="Offences punishable by criminal penalties sanctions freezing and confiscating proceeds of crime",
+            default_fallback="EU Regulation 2024/1624 Art. 29, OFAC Sanctions Regime & FATF Blacklist"
+        )
 
     # FAIL Condition 2: High-Risk / Non-Cooperative Jurisdiction ({KY, PA, VG, BS, RU})
     # AND amount >= 10,000 AND kyc_level != 'enhanced' -> Risk score 92
@@ -228,7 +266,10 @@ async def evaluate_transaction(
         verdict = "FAIL"
         risk_score = 92
         rule_triggered = "Missing Enhanced Due Diligence (EDD) for High-Risk Non-Cooperative Tax Haven / Sanctioned Jurisdiction"
-        legal_basis = "EU 6th Anti-Money Laundering Directive (6AMLD) Art. 18a & FATF Recommendation 19"
+        legal_basis = retrieve_statutory_basis(
+            search_query="Money laundering criminal activity definition property and high-risk predicate offences",
+            default_fallback="EU 6th Anti-Money Laundering Directive (6AMLD) Art. 18a & FATF Recommendation 19"
+        )
 
     # PASS Conditions
     else:
@@ -236,11 +277,17 @@ async def evaluate_transaction(
         if amount >= 10000:
             risk_score = 38
             rule_triggered = "Large Value Transaction - Threshold Reporting Exemption Verified"
-            legal_basis = "EU Regulation 2015/847 (Wire Transfer Regulation) & AMLD5 Large Transfer Framework"
+            legal_basis = retrieve_statutory_basis(
+                search_query="Subject matter and scope establishing minimum rules on money laundering offences",
+                default_fallback="EU Regulation 2015/847 (Wire Transfer Regulation) & AMLD5 Large Transfer Framework"
+            )
         else:
             risk_score = 12
             rule_triggered = "Standard Low-Risk Flow - Compliant Verification"
-            legal_basis = "EU Directive (EU) 2015/2366 (PSD2) & AMLD5 Simplified Customer Due Diligence"
+            legal_basis = retrieve_statutory_basis(
+                search_query="Directive scope and definitions concerning money laundering and property",
+                default_fallback="EU Directive (EU) 2015/2366 (PSD2) & AMLD5 Simplified Customer Due Diligence"
+            )
 
     # 3. Deterministic SHA-256 Hash Digest
     hash_payload = {
@@ -279,6 +326,10 @@ async def evaluate_transaction(
         scrubbed_payload_sent_to_engine=scrubbed
     )
 
+
+# =====================================================================
+# 5. Ledger History & Sandbox Purge Routes
+# =====================================================================
 
 @router.get(
     "/ledger",
@@ -336,5 +387,3 @@ async def purge_sandbox_ledger(
         "message": "Sandbox environment cleared.",
         "deleted_count": deleted_count
     }
-
-
