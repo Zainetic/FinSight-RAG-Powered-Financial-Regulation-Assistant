@@ -85,6 +85,13 @@ export default function SimulatorPage() {
   // Live Ledger History State
   const [ledgerHistory, setLedgerHistory] = useState<LedgerRecord[]>([]);
   const [isLoadingLedger, setIsLoadingLedger] = useState<boolean>(false);
+  const [isPurging, setIsPurging] = useState<boolean>(false);
+
+  // Admin Check
+  const isAdmin =
+    user?.role === "MASTER_ADMIN" ||
+    user?.role?.toUpperCase() === "ADMIN" ||
+    user?.role?.toUpperCase() === "SUPER_ADMIN";
 
   // Fetch Ledger History
   const fetchLedger = async () => {
@@ -113,10 +120,47 @@ export default function SimulatorPage() {
     }
   };
 
+  // Purge Sandbox Data (Admin Only)
+  const handlePurgeSandbox = async () => {
+    const confirmed = window.confirm(
+      "⚠️ Warning: Are you sure you want to purge all transaction sandbox ledger entries? This action cannot be undone."
+    );
+    if (!confirmed) return;
+
+    setIsPurging(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`${apiUrl}/api/v1/transactions/sandbox`, {
+        method: "DELETE",
+        credentials: "include",
+        headers,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || `Server returned HTTP ${res.status}`);
+      }
+
+      // Refresh ledger after successful purge
+      await fetchLedger();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to purge sandbox data.";
+      alert(msg);
+    } finally {
+      setIsPurging(false);
+    }
+  };
+
   // Initial Fetch on Component Mount
   useEffect(() => {
     fetchLedger();
   }, [token]);
+
 
   // Preset Handlers
   const applyPreset = (type: "routine" | "offshore" | "sanctioned") => {
@@ -735,6 +779,19 @@ export default function SimulatorPage() {
             </div>
 
             <div className="flex items-center space-x-3">
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={handlePurgeSandbox}
+                  disabled={isPurging}
+                  className="text-xs px-3.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 backdrop-blur-xl transition-all duration-200 ease-out active:scale-95 flex items-center space-x-1.5 font-mono shadow-[0_2px_12px_0_rgba(244,63,94,0.15)] disabled:opacity-50"
+                  title="Purge Sandbox Transaction Ledger (Admin Only)"
+                >
+                  <span>⚠️</span>
+                  <span>{isPurging ? "Purging..." : "⚠️ Purge Sandbox Data"}</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={fetchLedger}
@@ -746,6 +803,7 @@ export default function SimulatorPage() {
               </button>
             </div>
           </div>
+
 
           {/* Table Container */}
           <div className="overflow-x-auto rounded-2xl border border-white/5 bg-black/30">
