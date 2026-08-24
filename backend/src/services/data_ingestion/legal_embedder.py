@@ -12,9 +12,21 @@ import re
 import sys
 from typing import List, Dict, Any, Optional
 
-from langchain_core.documents import Document
-from langchain_community.vectorstores import FAISS
+try:
+    from langchain_core.documents import Document
+except ImportError:
+    try:
+        from langchain.schema import Document
+    except ImportError:
+        from langchain.docstore.document import Document
+
+try:
+    from langchain_community.vectorstores import FAISS
+except ImportError:
+    from langchain.vectorstores import FAISS
+
 from langchain_huggingface import HuggingFaceEmbeddings
+
 
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
