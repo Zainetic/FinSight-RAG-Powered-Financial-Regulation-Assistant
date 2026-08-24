@@ -1,10 +1,10 @@
 """
-FinSight RegTech - Legal Text Parser & Vector Store Ingestion Service
-====================================================================
-Splits regulatory text (AMLD6 / EU Directives) by statutory Articles,
-generates LangChain Document representations with structured metadata,
-computes dense vector embeddings (all-MiniLM-L6-v2), and upserts them
-into the FAISS vector database.
+FinSight RegTech - AMLD6 Legal Text Parser & FAISS Vector Store Ingestion
+========================================================================
+Reads the full statutory text from 'backend/amld6_raw.txt', parses and chunks
+the document by individual legal Articles, generates dense embeddings
+using the project's standard 'all-MiniLM-L6-v2' model, and persists the
+FAISS vector index binaries ('index.faiss' and 'index.pkl') to 'backend/data/faiss_index'.
 """
 
 import os
@@ -12,6 +12,22 @@ import re
 import sys
 from typing import List, Dict, Any, Optional
 
+# Auto-detect local virtual environment site-packages for seamless execution
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))  # src/services/data_ingestion
+SERVICES_DIR = os.path.dirname(SCRIPT_DIR)               # src/services
+SRC_DIR = os.path.dirname(SERVICES_DIR)                  # src
+BACKEND_DIR = os.path.dirname(SRC_DIR)                   # backend
+
+VENV_SITE_PACKAGES = os.path.join(BACKEND_DIR, ".venv", "Lib", "site-packages")
+if os.path.exists(VENV_SITE_PACKAGES) and VENV_SITE_PACKAGES not in sys.path:
+    sys.path.insert(0, VENV_SITE_PACKAGES)
+
+if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if sys.stderr and hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
+# LangChain and Vector Store Imports
 try:
     from langchain_core.documents import Document
 except ImportError:
@@ -28,81 +44,73 @@ except ImportError:
 from langchain_huggingface import HuggingFaceEmbeddings
 
 
-if sys.stdout and hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
-if sys.stderr and hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8")
+# =====================================================================
+# Configuration Paths
+# =====================================================================
 
-# Dynamically calculate project paths
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))  # src/services/data_ingestion
-SERVICES_DIR = os.path.dirname(SCRIPT_DIR)               # src/services
-SRC_DIR = os.path.dirname(SERVICES_DIR)                  # src
-BACKEND_DIR = os.path.dirname(SRC_DIR)                   # backend
-
+RAW_TEXT_PATH = os.path.join(BACKEND_DIR, "amld6_raw.txt")
 FAISS_INDEX_DIR = os.path.join(BACKEND_DIR, "data", "faiss_index")
-DEFAULT_INPUT_FILE = os.path.join(BACKEND_DIR, "amld6_raw.txt")
+EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 
 
 # =====================================================================
-# 1. Legal Text Parser & Chunking Engine
+# 1. Statutory Article Parser & Document Chunking
 # =====================================================================
 
-def chunk_by_article(
-    text: str,
-    source_name: str = "AMLD6",
-    jurisdiction: str = "EU",
-    doc_type: str = "directive"
-) -> List[Dict[str, Any]]:
+def parse_and_chunk_articles(raw_text: str) -> List[Document]:
     """
-    Parses and divides plain legal/statutory text into distinct chunks
-    where each chunk corresponds to an individual legal 'Article'.
+    Parses statutory text and splits the document by specific Articles.
+    Wraps each article into a LangChain Document with enriched regulatory metadata.
 
     Args:
-        text: Full plain text of the regulation/directive.
-        source_name: Primary regulatory citation/acronym (e.g., 'AMLD6').
-        jurisdiction: Target regional jurisdiction (e.g., 'EU', 'UK', 'US').
-        doc_type: Type of statutory instrument (e.g., 'directive', 'regulation').
+        raw_text: Full plain text of the directive / regulation.
 
     Returns:
-        List of dictionaries with 'page_content' and structured 'metadata'.
+        List of LangChain Document objects.
     """
-    # Regex pattern to identify standard EU/UK/US Article headers: "Article 1", "Article 2", etc.
+    # Regex to match Article headers (e.g., 'Article 1', 'Article 2', etc.)
     article_pattern = r'(?i)(?:^|\n)\s*Article\s+(\d+)\b'
-    matches = list(re.finditer(article_pattern, text))
+    matches = list(re.finditer(article_pattern, raw_text))
 
-    chunks: List[Dict[str, Any]] = []
+    documents: List[Document] = []
 
     if not matches:
-        # Fallback if no explicit "Article X" headers exist: return text as single chunk
-        cleaned = text.strip()
+        print("⚠️  No explicit 'Article X' headers detected. Chunking entire text as single document.")
+        cleaned = raw_text.strip()
         if cleaned:
-            chunks.append({
-                "page_content": cleaned,
-                "metadata": {
-                    "source": source_name,
-                    "article_number": 1,
-                    "jurisdiction": jurisdiction,
-                    "type": doc_type
-                }
-            })
-        return chunks
+            documents.append(
+                Document(
+                    page_content=cleaned,
+                    metadata={
+                        "source": "AMLD6",
+                        "celex_id": "32018L1673",
+                        "jurisdiction": "EU",
+                        "type": "directive",
+                        "article_number": 1,
+                    }
+                )
+            )
+        return documents
 
-    # 1. Optional Preamble / Recitals chunk (content preceding Article 1)
+    # 1. Preamble / Recitals chunk (content preceding Article 1)
     if matches[0].start() > 150:
-        preamble_text = text[:matches[0].start()].strip()
+        preamble_text = raw_text[:matches[0].start()].strip()
         if preamble_text and len(preamble_text) > 100:
-            chunks.append({
-                "page_content": preamble_text,
-                "metadata": {
-                    "source": source_name,
-                    "article_number": 0,
-                    "section_title": "Preamble & Recitals",
-                    "jurisdiction": jurisdiction,
-                    "type": doc_type
-                }
-            })
+            documents.append(
+                Document(
+                    page_content=preamble_text,
+                    metadata={
+                        "source": "AMLD6",
+                        "celex_id": "32018L1673",
+                        "jurisdiction": "EU",
+                        "type": "directive",
+                        "article_number": 0,
+                        "title": "Preamble & Recitals",
+                    }
+                )
+            )
 
-    # 2. Iterate through each Article match and slice the text block
+    # 2. Extract each individual Article block
     for idx, match in enumerate(matches):
         try:
             art_num = int(match.group(1))
@@ -110,153 +118,119 @@ def chunk_by_article(
             art_num = idx + 1
 
         start_pos = match.start()
-        end_pos = matches[idx + 1].start() if (idx + 1 < len(matches)) else len(text)
+        end_pos = matches[idx + 1].start() if (idx + 1 < len(matches)) else len(raw_text)
 
-        article_block = text[start_pos:end_pos].strip()
+        article_block = raw_text[start_pos:end_pos].strip()
 
-        # Extract title line if available right after Article header
+        # Extract title line if available right after the Article header
         lines = [line.strip() for line in article_block.splitlines() if line.strip()]
         title_summary = lines[1] if len(lines) > 1 and len(lines[1]) < 120 else f"Article {art_num}"
 
-        chunks.append({
-            "page_content": article_block,
-            "metadata": {
-                "source": source_name,
+        doc = Document(
+            page_content=article_block,
+            metadata={
+                "source": "AMLD6",
+                "celex_id": "32018L1673",
+                "jurisdiction": "EU",
+                "type": "directive",
                 "article_number": art_num,
                 "title": title_summary,
-                "jurisdiction": jurisdiction,
-                "type": doc_type
             }
-        })
+        )
+        documents.append(doc)
 
-    return chunks
+    return documents
 
 
 # =====================================================================
-# 2. Vector Database Embedding & Upsert Engine
+# 2. FAISS Vector Store Building & Persistence
 # =====================================================================
 
-def upsert_to_vectorstore(
-    chunks: List[Dict[str, Any]],
-    index_dir: Optional[str] = None
+def build_faiss_vectorstore(
+    documents: List[Document],
+    index_dir: str = FAISS_INDEX_DIR,
+    model_name: str = EMBEDDING_MODEL_NAME
 ) -> FAISS:
     """
-    Converts chunked dictionaries to LangChain Document instances,
-    computes HuggingFace Sentence-Transformer embeddings, and upserts
-    them into the FAISS vector database.
+    Initializes HuggingFace Sentence-Transformer embeddings, builds a fresh
+    FAISS vector store, and saves 'index.faiss' and 'index.pkl' to disk.
 
     Args:
-        chunks: List of chunk dictionaries containing 'page_content' and 'metadata'.
-        index_dir: Target path for the FAISS index binaries (defaults to data/faiss_index).
+        documents: List of LangChain Document objects to embed.
+        index_dir: Destination folder path for FAISS index binaries.
+        model_name: Sentence-Transformer model identifier.
 
     Returns:
-        Updated LangChain FAISS vector store object.
+        The newly instantiated FAISS vector store.
     """
-    if not index_dir:
-        index_dir = FAISS_INDEX_DIR
+    if not documents:
+        raise ValueError("Cannot build FAISS index: document list is empty.")
 
-    if not chunks:
-        raise ValueError("No chunks provided for vector store upsert.")
-
-    # 1. Convert to LangChain Document objects
-    documents = [
-        Document(
-            page_content=chunk["page_content"],
-            metadata=chunk.get("metadata", {})
-        )
-        for chunk in chunks
-        if chunk.get("page_content", "").strip()
-    ]
-
-    print(f"\n[Embedder] Initializing Sentence-Transformer Embedding Model ('all-MiniLM-L6-v2')...")
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    print(f"\n[Embedder] Initializing standard project embeddings ('{model_name}')...")
+    embeddings = HuggingFaceEmbeddings(model_name=model_name)
 
     os.makedirs(index_dir, exist_ok=True)
-    index_file = os.path.join(index_dir, "index.faiss")
 
-    # 2. Upsert or create FAISS vector index
-    if os.path.exists(index_file):
-        print(f"[Vector Store] Loading existing FAISS index from: '{index_dir}'...")
-        vector_db = FAISS.load_local(
-            index_dir,
-            embeddings,
-            allow_dangerous_deserialization=True
-        )
-        print(f"[Vector Store] Adding {len(documents)} new regulatory Article documents to index...")
-        vector_db.add_documents(documents)
-    else:
-        print(f"[Vector Store] Building new FAISS vector database with {len(documents)} documents...")
-        vector_db = FAISS.from_documents(documents, embeddings)
+    print(f"[Vector Store] Embedding and indexing {len(documents)} regulatory documents...")
+    vector_db = FAISS.from_documents(documents, embeddings)
 
-    # 3. Persist index binaries to disk
+    # Persist index binaries (index.faiss and index.pkl)
     vector_db.save_local(index_dir)
-    print(f"✅ Successfully persisted FAISS vector index to: '{index_dir}'")
+    print(f"✅ FAISS index binaries saved successfully to: '{index_dir}'")
+    print(f"   • {os.path.join(index_dir, 'index.faiss')}")
+    print(f"   • {os.path.join(index_dir, 'index.pkl')}")
 
     return vector_db
 
 
 # =====================================================================
-# 3. Pipeline Execution
+# 3. Main Pipeline Execution
 # =====================================================================
 
-def ingest_amld6_pipeline(raw_file_path: str = DEFAULT_INPUT_FILE) -> Dict[str, Any]:
-    """
-    Orchestrates the ingestion pipeline:
-    1. Reads statutory text from file (or triggers live SPARQL fetch if missing).
-    2. Chunks statutory text by Article.
-    3. Generates embeddings and upserts into FAISS vector database.
-    """
-    print("=" * 70)
-    print("⚖️  FinSight RegTech: Legal Text Parser & FAISS Vector Store Ingestion")
-    print("=" * 70)
+def main():
+    print("=" * 72)
+    print("⚖️  FinSight RegTech: AMLD6 Legal Parser & Vector Store Ingestion")
+    print("=" * 72)
 
-    # Step 1: Read Statutory Text
-    if os.path.exists(raw_file_path):
-        print(f"\n[1/3] Loading statutory text from local file: '{raw_file_path}'...")
-        with open(raw_file_path, "r", encoding="utf-8") as f:
-            raw_text = f.read()
-    else:
-        print(f"\n[1/3] Local file '{raw_file_path}' not found. Triggering live SPARQL fetcher...")
-        from src.services.data_ingestion.eur_lex_fetcher import query_eur_lex_sparql, download_regulation_text, clean_html_content
-        meta = query_eur_lex_sparql("32018L1673")
-        html_content = download_regulation_text(meta["direct_doc_url"])
-        raw_text = clean_html_content(html_content)
+    # Step 1: Read raw statutory text from amld6_raw.txt
+    print(f"\n[1/3] Reading statutory text from: '{RAW_TEXT_PATH}'...")
+    if not os.path.exists(RAW_TEXT_PATH):
+        print(f"⚠️  File '{RAW_TEXT_PATH}' not found. Fetching live via SPARQL fetcher...")
+        from src.services.data_ingestion.eur_lex_fetcher import fetch_amld6_regulation
+        fetch_amld6_regulation(RAW_TEXT_PATH)
 
-    print(f" • Loaded {len(raw_text):,} characters of legal statutory content.")
+    with open(RAW_TEXT_PATH, "r", encoding="utf-8") as f:
+        raw_content = f.read()
 
-    # Step 2: Chunk by Article
-    print("\n[2/3] Parsing and chunking regulatory text by Article...")
-    chunks = chunk_by_article(
-        text=raw_text,
-        source_name="AMLD6",
-        jurisdiction="EU",
-        doc_type="directive"
+    print(f" • Loaded {len(raw_content):,} characters of statutory content.")
+
+    # Step 2: Parse and chunk by Article
+    print("\n[2/3] Parsing statutory text into individual Article Documents...")
+    documents = parse_and_chunk_articles(raw_content)
+    print(f" • Generated {len(documents)} LangChain Document chunks.")
+
+    print("\n--- Document Chunks Sample Preview ---")
+    for idx, doc in enumerate(documents[:5]):
+        art_num = doc.metadata.get("article_number", idx)
+        title = doc.metadata.get("title", f"Article {art_num}")
+        preview = doc.page_content[:85].replace("\n", " ")
+        print(f"   [{idx + 1}] Article {art_num:02d}: {title:<35} | Preview: \"{preview}...\"")
+
+    if len(documents) > 5:
+        print(f"   [... and {len(documents) - 5} more Articles ...]")
+
+    # Step 3: Build and persist fresh FAISS Vector Store
+    print("\n[3/3] Generating dense embeddings and persisting FAISS vector store...")
+    vector_db = build_faiss_vectorstore(
+        documents=documents,
+        index_dir=FAISS_INDEX_DIR,
+        model_name=EMBEDDING_MODEL_NAME
     )
-    print(f" • Successfully created {len(chunks)} structured Article chunks.")
 
-    for i, c in enumerate(chunks[:5]):
-        art_num = c["metadata"].get("article_number")
-        title = c["metadata"].get("title", c["metadata"].get("section_title", "N/A"))
-        preview = c["page_content"][:80].replace("\n", " ")
-        print(f"   [{i + 1}] Article {art_num}: {title} (Preview: \"{preview}...\")")
-
-    if len(chunks) > 5:
-        print(f"   [... and {len(chunks) - 5} more Articles ...]")
-
-    # Step 3: Embed & Upsert to Vector Store
-    print("\n[3/3] Generating dense embeddings and upserting to FAISS vector database...")
-    vector_db = upsert_to_vectorstore(chunks, FAISS_INDEX_DIR)
-
-    print("\n✅ End-to-End Legal Parsing & FAISS Vector Upsert Pipeline Complete!")
-    print("=" * 70)
-
-    return {
-        "status": "success",
-        "chunks_count": len(chunks),
-        "index_dir": FAISS_INDEX_DIR,
-        "sample_metadata": chunks[0]["metadata"] if chunks else {}
-    }
+    print("\n" + "=" * 72)
+    print(f"✅ Ingestion Complete: {len(documents)} AMLD6 Articles successfully indexed in FAISS.")
+    print("=" * 72)
 
 
 if __name__ == "__main__":
-    ingest_amld6_pipeline(DEFAULT_INPUT_FILE)
+    main()
