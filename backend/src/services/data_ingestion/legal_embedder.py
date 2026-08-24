@@ -6,7 +6,6 @@ the document by individual legal Articles, generates dense embeddings
 using the project's standard 'all-MiniLM-L6-v2' model, and persists the
 FAISS vector index binaries ('index.faiss' and 'index.pkl') to 'backend/data/faiss_index'.
 """
-
 import os
 import re
 import sys
