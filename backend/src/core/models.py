@@ -1,6 +1,6 @@
 """
 FinSight RegTech - SQLAlchemy Data Models
-Defines ORM mappings for Organizations, Users, Compliance Ledgers, and Transaction Gatekeeper Ledgers.
+Defines ORM mappings for Organizations, Users, Compliance Ledgers, Transaction Gatekeeper Ledgers, and Prompts.
 """
 
 import uuid
@@ -76,4 +76,26 @@ class TransactionLedger(Base):
             "legal_basis": self.legal_basis,
             "sha256_hash": self.sha256_hash,
             "timestamp": self.timestamp.isoformat() if self.timestamp else None
+        }
+
+
+class Prompt(Base):
+    """
+    SQLAlchemy Model for system prompts, test scenarios, and architectural template queries.
+    """
+    __tablename__ = "prompts"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
+    title = Column(String(255), nullable=True)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self):
+        return {
+            "id": str(self.id),
+            "org_id": str(self.org_id) if self.org_id else None,
+            "title": self.title,
+            "content": self.content,
+            "created_at": self.created_at.isoformat() if self.created_at else None
         }
