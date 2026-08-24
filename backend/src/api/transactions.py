@@ -8,13 +8,15 @@ import json
 import hashlib
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Literal, List
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.auth import get_current_user, CurrentUser
 from src.core.database import get_db
 from src.core.models import TransactionLedger
+
 
 
 
@@ -300,4 +302,39 @@ async def get_transaction_ledger(
     result = await db.execute(query)
     entries = result.scalars().all()
     return [entry.to_dict() for entry in entries]
+
+
+@router.delete(
+    "/sandbox",
+    status_code=status.HTTP_200_OK,
+    summary="Purge Sandbox Transaction Ledger (RBAC Protected: Admin Only)",
+    description="Deletes all simulated dummy transactions from the ledger database. Strictly restricted to administrative roles."
+)
+async def purge_sandbox_ledger(
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    RBAC-protected sandbox purge:
+    Verifies user possesses administrative privileges (ADMIN, MASTER_ADMIN, SUPER_ADMIN).
+    Deletes all records from the transaction_ledger table.
+    """
+    user_role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
+    if user_role.upper() not in ["ADMIN", "MASTER_ADMIN", "SUPER_ADMIN"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to purge sandbox"
+        )
+
+    result = await db.execute(delete(TransactionLedger))
+    await db.commit()
+
+    deleted_count = result.rowcount if hasattr(result, "rowcount") else 0
+
+    return {
+        "status": "success",
+        "message": "Sandbox environment cleared.",
+        "deleted_count": deleted_count
+    }
+
 
