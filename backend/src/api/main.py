@@ -11,6 +11,8 @@ from src.core.ledger import init_ledger_table
 from src.api.routes import router as compliance_router
 from src.api.auth import router as auth_router
 from src.api.transactions import router as transactions_router
+from src.api.prompts import router as prompts_router
+
 
 
 @asynccontextmanager
@@ -69,10 +71,12 @@ app.add_middleware(
     expose_headers=["Strict-Transport-Security", "X-Content-Type-Options", "X-Frame-Options"],
 )
 
-# Include Core Authentication, RegTech & Transaction Gatekeeper Routers
+# Include Core Authentication, RegTech, Transaction Gatekeeper & Prompts Routers
 app.include_router(auth_router)
 app.include_router(compliance_router)
 app.include_router(transactions_router)
+app.include_router(prompts_router)
+
 
 
 
