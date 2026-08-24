@@ -409,6 +409,52 @@ export default function ComplianceDashboard() {
     }
   };
 
+  // Admin Check
+  const isAdmin =
+    user?.role === "MASTER_ADMIN" ||
+    user?.role?.toUpperCase() === "ADMIN" ||
+    user?.role?.toUpperCase() === "SUPER_ADMIN";
+
+  // Prompt / Audit Record Hard Delete (Admin Only)
+  const handleDeletePrompt = async (auditId: string) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this prompt / audit record? This action cannot be undone."
+    );
+    if (!confirmed) return;
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`${apiUrl}/api/v1/prompts/${auditId}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Server returned HTTP ${res.status}`);
+      }
+
+      // Remove item from UI state
+      if (ledgerData) {
+        setLedgerData({
+          ...ledgerData,
+          blocks: ledgerData.blocks.filter((b) => b.audit_id !== auditId),
+          total: Math.max(0, ledgerData.total - 1),
+        });
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to delete prompt.";
+      alert(msg);
+    }
+  };
+
+
 
 
   if (isAuthLoading || !isAuthenticated) {
@@ -983,8 +1029,22 @@ export default function ComplianceDashboard() {
                             <span className="text-[11px] text-white/40 font-mono">
                               {formatTimestamp(block.timestamp)}
                             </span>
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePrompt(block.audit_id);
+                                }}
+                                className="text-white/40 hover:text-rose-400 p-1 rounded-lg hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all duration-200 active:scale-90"
+                                title="Delete Prompt / Audit Entry (Admin Only)"
+                              >
+                                🗑️
+                              </button>
+                            )}
                           </div>
                         </div>
+
 
                         {/* Cryptographic Linkage Info */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
