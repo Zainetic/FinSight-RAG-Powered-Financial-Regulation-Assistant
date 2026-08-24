@@ -5,11 +5,13 @@ import socket
 import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Optional, Generator, Dict, Any, List
+from typing import Optional, Generator, AsyncGenerator, Dict, Any, List
 import psycopg2
 from psycopg2 import pool
 from psycopg2.extras import Json, RealDictCursor
 from dotenv import load_dotenv
+
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
 # Load database credentials from the .env file
 load_dotenv()
@@ -19,6 +21,13 @@ _db_lock = threading.Lock()
 _pool_instance: Optional[pool.ThreadedConnectionPool] = None
 _pool_lock = threading.Lock()
 _db_unreachable = False
+
+# Async SQLAlchemy Engine & Session Pool
+_async_engine = None
+_async_session_factory = None
+_async_lock = threading.RLock()
+
+
 
 
 def _get_resolved_db_url() -> str:
@@ -119,7 +128,64 @@ def get_db_connection() -> Generator[psycopg2.extensions.connection, None, None]
             conn_pool.putconn(conn, close=has_error)
 
 
+# =====================================================================
+# SQLAlchemy Async Engine & Session Dependency (FastAPI Depends(get_db))
+# =====================================================================
+
+def get_async_engine():
+    """Returns a thread-safe singleton async SQLAlchemy engine."""
+    global _async_engine
+    if _async_engine is None:
+        with _async_lock:
+            if _async_engine is None:
+                db_url = _get_resolved_db_url()
+                if db_url.startswith("postgresql://"):
+                    db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+                elif db_url.startswith("postgres://"):
+                    db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+                _async_engine = create_async_engine(
+                    db_url,
+                    echo=False,
+                    pool_pre_ping=True,
+                    pool_size=10,
+                    max_overflow=20
+                )
+    return _async_engine
+
+
+def get_async_session_factory():
+    """Returns a thread-safe async session factory."""
+    global _async_session_factory
+    if _async_session_factory is None:
+        with _async_lock:
+            if _async_session_factory is None:
+                engine = get_async_engine()
+                _async_session_factory = async_sessionmaker(
+                    engine,
+                    class_=AsyncSession,
+                    expire_on_commit=False
+                )
+    return _async_session_factory
+
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """
+    FastAPI dependency yielding an AsyncSession for database operations.
+    Usage:
+        @router.post("/evaluate")
+        async def evaluate(payload: TransactionPayload, db: AsyncSession = Depends(get_db)):
+    """
+    session_factory = get_async_session_factory()
+    async with session_factory() as session:
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+
+
 def init_db() -> bool:
+
     """
     Initializes the PostgreSQL database with multi-tenant B2B schema:
     1. organizations table (id UUID, name String, created_at TIMESTAMPTZ)
@@ -197,7 +263,22 @@ def init_db() -> bool:
                         ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE CASCADE;
                     """)
 
-                    # 5. Add performance & search indexes
+                    # 5. Create the automated transaction gatekeeper ledger table
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS transaction_ledger (
+                            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                            transaction_id VARCHAR(100) NOT NULL,
+                            payload_data JSONB NOT NULL,
+                            verdict VARCHAR(10) NOT NULL,
+                            risk_score INTEGER NOT NULL,
+                            rule_triggered TEXT,
+                            legal_basis TEXT,
+                            sha256_hash VARCHAR(64) NOT NULL,
+                            timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                        );
+                    """)
+
+                    # 6. Add performance & search indexes
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_organizations_name ON organizations (name);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_org_id ON users (org_id);")
@@ -206,11 +287,15 @@ def init_db() -> bool:
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_compliance_ledger_prev_hash ON compliance_ledger (prev_hash);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_compliance_ledger_tx_hash ON compliance_ledger (tx_hash);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_compliance_ledger_payload_gin ON compliance_ledger USING gin (payload);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_transaction_ledger_tx_id ON transaction_ledger (transaction_id);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_transaction_ledger_hash ON transaction_ledger (sha256_hash);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_transaction_ledger_timestamp ON transaction_ledger (timestamp);")
 
                     conn.commit()
                     _db_initialized = True
                     print("✅ PostgreSQL Multi-Tenant Schema, Organizations, Users, & Ledger indexes initialized.")
                     return True
+
 
         except Exception as e:
             sys.stderr.write(f"[Database Error] DB initialization failed: {e}\n")
