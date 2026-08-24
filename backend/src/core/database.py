@@ -278,7 +278,18 @@ def init_db() -> bool:
                         );
                     """)
 
-                    # 6. Add performance & search indexes
+                    # 6. Create the prompts and template table
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS prompts (
+                            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                            org_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+                            title VARCHAR(255),
+                            content TEXT NOT NULL,
+                            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                        );
+                    """)
+
+                    # 7. Add performance & search indexes
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_organizations_name ON organizations (name);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_org_id ON users (org_id);")
@@ -290,11 +301,14 @@ def init_db() -> bool:
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_transaction_ledger_tx_id ON transaction_ledger (transaction_id);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_transaction_ledger_hash ON transaction_ledger (sha256_hash);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_transaction_ledger_timestamp ON transaction_ledger (timestamp);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_prompts_org_id ON prompts (org_id);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_prompts_created_at ON prompts (created_at);")
 
                     conn.commit()
                     _db_initialized = True
                     print("✅ PostgreSQL Multi-Tenant Schema, Organizations, Users, & Ledger indexes initialized.")
                     return True
+
 
 
         except Exception as e:
