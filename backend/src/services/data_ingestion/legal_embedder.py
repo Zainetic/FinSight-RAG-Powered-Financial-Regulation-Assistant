@@ -3,19 +3,26 @@ FinSight RegTech - AMLD6 Legal Text Parser & FAISS Vector Store Ingestion
 ========================================================================
 Reads the full statutory text from 'backend/amld6_raw.txt', parses and chunks
 the document by individual legal Articles, generates dense embeddings
-using the project's standard 'all-MiniLM-L6-v2' model, and persists the
-FAISS vector index binaries ('index.faiss' and 'index.pkl') to 'backend/data/faiss_index'.
+using Google Gemini API ('models/gemini-embedding-001' / 'models/embedding-001'),
+and persists the FAISS vector index binaries ('index.faiss' and 'index.pkl')
+to 'backend/data/faiss_index' with zero local GPU/PyTorch memory footprint.
 """
+
 import os
 import re
 import sys
 from typing import List, Dict, Any, Optional
+from dotenv import load_dotenv
 
 # Auto-detect local virtual environment site-packages for seamless execution
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))  # src/services/data_ingestion
 SERVICES_DIR = os.path.dirname(SCRIPT_DIR)               # src/services
 SRC_DIR = os.path.dirname(SERVICES_DIR)                  # src
 BACKEND_DIR = os.path.dirname(SRC_DIR)                   # backend
+
+# Load project environment variables (.env)
+load_dotenv(os.path.join(BACKEND_DIR, ".env"))
+load_dotenv(os.path.join(os.path.dirname(BACKEND_DIR), ".env"))
 
 VENV_SITE_PACKAGES = os.path.join(BACKEND_DIR, ".venv", "Lib", "site-packages")
 if os.path.exists(VENV_SITE_PACKAGES) and VENV_SITE_PACKAGES not in sys.path:
@@ -40,16 +47,40 @@ try:
 except ImportError:
     from langchain.vectorstores import FAISS
 
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 
 # =====================================================================
-# Configuration Paths
+# Configuration Paths & Embedding Settings
 # =====================================================================
 
 RAW_TEXT_PATH = os.path.join(BACKEND_DIR, "amld6_raw.txt")
 FAISS_INDEX_DIR = os.path.join(BACKEND_DIR, "data", "faiss_index")
-EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+DEFAULT_EMBEDDING_MODEL = os.getenv("GOOGLE_EMBEDDING_MODEL", "models/gemini-embedding-001")
+
+
+def get_google_embeddings(model_name: str = DEFAULT_EMBEDDING_MODEL) -> GoogleGenerativeAIEmbeddings:
+    """
+    Initializes Google Generative AI Embeddings using the Gemini API.
+    Gracefully normalizes model identifiers to ensure cross-version compatibility.
+    """
+    # Normalize legacy/alias model identifiers to the active v1beta Gemini endpoint
+    if model_name in ["models/embedding-001", "embedding-001"]:
+        normalized_model = "models/gemini-embedding-001"
+    else:
+        normalized_model = model_name
+
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError(
+            "GOOGLE_API_KEY environment variable is not set. "
+            "Please configure GOOGLE_API_KEY in your .env file or environment."
+        )
+
+    return GoogleGenerativeAIEmbeddings(
+        model=normalized_model,
+        google_api_key=api_key
+    )
 
 
 # =====================================================================
@@ -148,16 +179,16 @@ def parse_and_chunk_articles(raw_text: str) -> List[Document]:
 def build_faiss_vectorstore(
     documents: List[Document],
     index_dir: str = FAISS_INDEX_DIR,
-    model_name: str = EMBEDDING_MODEL_NAME
+    model_name: str = DEFAULT_EMBEDDING_MODEL
 ) -> FAISS:
     """
-    Initializes HuggingFace Sentence-Transformer embeddings, builds a fresh
-    FAISS vector store, and saves 'index.faiss' and 'index.pkl' to disk.
+    Initializes Google Generative AI embeddings, builds a fresh FAISS vector store,
+    and saves 'index.faiss' and 'index.pkl' to disk without requiring local GPU/PyTorch RAM.
 
     Args:
         documents: List of LangChain Document objects to embed.
         index_dir: Destination folder path for FAISS index binaries.
-        model_name: Sentence-Transformer model identifier.
+        model_name: Google GenAI embedding model identifier.
 
     Returns:
         The newly instantiated FAISS vector store.
@@ -165,12 +196,12 @@ def build_faiss_vectorstore(
     if not documents:
         raise ValueError("Cannot build FAISS index: document list is empty.")
 
-    print(f"\n[Embedder] Initializing standard project embeddings ('{model_name}')...")
-    embeddings = HuggingFaceEmbeddings(model_name=model_name)
+    print(f"\n[Embedder] Initializing Google API Embeddings ('{model_name}')...")
+    embeddings = get_google_embeddings(model_name)
 
     os.makedirs(index_dir, exist_ok=True)
 
-    print(f"[Vector Store] Embedding and indexing {len(documents)} regulatory documents...")
+    print(f"[Vector Store] Calling Google Gemini API to embed {len(documents)} regulatory documents...")
     vector_db = FAISS.from_documents(documents, embeddings)
 
     # Persist index binaries (index.faiss and index.pkl)
@@ -218,16 +249,16 @@ def main():
     if len(documents) > 5:
         print(f"   [... and {len(documents) - 5} more Articles ...]")
 
-    # Step 3: Build and persist fresh FAISS Vector Store
-    print("\n[3/3] Generating dense embeddings and persisting FAISS vector store...")
+    # Step 3: Build and persist fresh FAISS Vector Store using Google Gemini Embeddings
+    print("\n[3/3] Generating dense embeddings via Google Gemini API & saving FAISS index...")
     vector_db = build_faiss_vectorstore(
         documents=documents,
         index_dir=FAISS_INDEX_DIR,
-        model_name=EMBEDDING_MODEL_NAME
+        model_name=DEFAULT_EMBEDDING_MODEL
     )
 
     print("\n" + "=" * 72)
-    print(f"✅ Ingestion Complete: {len(documents)} AMLD6 Articles successfully indexed in FAISS.")
+    print(f"✅ Ingestion Complete: {len(documents)} AMLD6 Articles indexed via Google Gemini API.")
     print("=" * 72)
 
 

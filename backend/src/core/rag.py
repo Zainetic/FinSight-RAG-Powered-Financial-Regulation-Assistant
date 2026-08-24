@@ -7,13 +7,14 @@ from typing import List, Optional, Any, Dict
 from pydantic import BaseModel, Field
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_community.vectorstores import FAISS
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from src.core.llm import get_gemini_llm
 
 # Dynamically calculate project root to prevent broken relative paths
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))  # src/core
 PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))  # root workspace
 FAISS_INDEX_DIR = os.path.join(PROJECT_ROOT, "data", "faiss_index")
+DEFAULT_EMBEDDING_MODEL = os.getenv("GOOGLE_EMBEDDING_MODEL", "models/gemini-embedding-001")
 
 
 class NuclearLogger(BaseCallbackHandler):
@@ -92,19 +93,27 @@ class ComplianceJudgment(BaseModel):
 
 
 # --- Thread-Safe Singleton Cache for Embeddings & Vector Store ---
-_embeddings_instance: Optional[HuggingFaceEmbeddings] = None
+_embeddings_instance: Optional[GoogleGenerativeAIEmbeddings] = None
 _vector_db_instance: Optional[FAISS] = None
 _store_lock = threading.RLock()
 
 
-def get_embeddings() -> HuggingFaceEmbeddings:
-    """Returns a singleton instance of the HuggingFace embedding model."""
+def get_embeddings() -> GoogleGenerativeAIEmbeddings:
+    """Returns a thread-safe singleton instance of GoogleGenerativeAIEmbeddings."""
     global _embeddings_instance
     if _embeddings_instance is None:
         with _store_lock:
             if _embeddings_instance is None:
-                _embeddings_instance = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+                model_name = DEFAULT_EMBEDDING_MODEL
+                if model_name in ["models/embedding-001", "embedding-001"]:
+                    model_name = "models/gemini-embedding-001"
+                api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+                _embeddings_instance = GoogleGenerativeAIEmbeddings(
+                    model=model_name,
+                    google_api_key=api_key
+                )
     return _embeddings_instance
+
 
 
 def get_vector_store() -> FAISS:
