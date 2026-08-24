@@ -5,7 +5,7 @@ import json
 import threading
 from typing import List, Optional, Any, Dict
 from pydantic import BaseModel, Field
-from langchain_core.callbacks import BaseCallbackHandler, StdOutCallbackHandler
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from src.core.llm import get_gemini_llm
@@ -119,14 +119,14 @@ def get_vector_store() -> FAISS:
                 if not os.path.exists(FAISS_INDEX_DIR):
                     raise FileNotFoundError(
                         f"FAISS index directory not found at: '{FAISS_INDEX_DIR}'. "
-                        "Please run 'python -m src.ingestion.build_index' first to generate vector embeddings."
+                        "Please run 'python -m src.services.data_ingestion.legal_embedder' to generate vector embeddings."
                     )
                 index_faiss_file = os.path.join(FAISS_INDEX_DIR, "index.faiss")
                 index_pkl_file = os.path.join(FAISS_INDEX_DIR, "index.pkl")
                 if not os.path.exists(index_faiss_file) or not os.path.exists(index_pkl_file):
                     raise FileNotFoundError(
                         f"FAISS index binaries missing in '{FAISS_INDEX_DIR}' (requires both 'index.faiss' and 'index.pkl'). "
-                        "Please run 'python -m src.ingestion.build_index' to rebuild."
+                        "Please run 'python -m src.services.data_ingestion.legal_embedder' to rebuild."
                     )
                 try:
                     embeddings = get_embeddings()
@@ -138,12 +138,13 @@ def get_vector_store() -> FAISS:
                 except Exception as e:
                     raise RuntimeError(
                         f"Failed to load FAISS index from '{FAISS_INDEX_DIR}': {e}. "
-                        "Rebuild the index by running 'python -m src.ingestion.build_index'."
+                        "Rebuild the index by running 'python -m src.services.data_ingestion.legal_embedder'."
                     ) from e
     return _vector_db_instance
 
 
 def clean_regulatory_text(text: str) -> str:
+
     """
     Cleans and repairs intra-word kerning spaces and spacing artifacts commonly
     introduced by PDF font subsets in EUR-Lex and EU official journal documents.

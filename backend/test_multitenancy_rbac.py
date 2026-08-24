@@ -186,9 +186,11 @@ def test_fastapi_auth_and_rbac_endpoints():
         print("  ✅ RBAC Enforced: DEVELOPER is blocked from manual overrides (HTTP 403 Forbidden).")
 
         # 7. Unauthenticated request to /api/v1/ledger must return 401 Unauthorized
+        client.cookies.clear()
         unauth_ledger = client.get("/api/v1/ledger")
         assert unauth_ledger.status_code == 401, f"Expected 401 Unauthorized, got {unauth_ledger.status_code}"
         print("  ✅ Endpoint Security: Unauthenticated request to /api/v1/ledger blocked (HTTP 401).")
+
 
         # 8. Authenticated request to /api/v1/ledger returns organization's ledger
         auth_ledger = client.get("/api/v1/ledger", headers=dev_auth_header)

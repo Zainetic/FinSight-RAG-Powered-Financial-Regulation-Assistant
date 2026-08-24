@@ -1,11 +1,18 @@
 import os
+import sys
 import json
 from dotenv import load_dotenv
+
+if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if sys.stderr and hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
 
 # Load local environment configuration (.env)
 load_dotenv()
 
 from src.core.rag import query_compliance_engine
+
 
 
 def run_test():
