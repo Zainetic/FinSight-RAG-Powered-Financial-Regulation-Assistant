@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
 
@@ -47,6 +47,18 @@ interface GatekeeperResponse {
   scrubbed_payload_sent_to_engine: ScrubbedPayload;
 }
 
+interface LedgerRecord {
+  id?: string;
+  transaction_id: string;
+  payload_data?: Record<string, unknown>;
+  verdict: "PASS" | "FAIL" | string;
+  risk_score: number;
+  rule_triggered?: string | null;
+  legal_basis?: string | null;
+  sha256_hash: string;
+  timestamp?: string | null;
+}
+
 const DEFAULT_TRANSACTION: TransactionFormState = {
   tx_id: "TX-2026-894102",
   sender_name: "Fintech Core Ltd",
@@ -69,6 +81,42 @@ export default function SimulatorPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [result, setResult] = useState<GatekeeperResponse | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // Live Ledger History State
+  const [ledgerHistory, setLedgerHistory] = useState<LedgerRecord[]>([]);
+  const [isLoadingLedger, setIsLoadingLedger] = useState<boolean>(false);
+
+  // Fetch Ledger History
+  const fetchLedger = async () => {
+    setIsLoadingLedger(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`${apiUrl}/api/v1/transactions/ledger`, {
+        method: "GET",
+        credentials: "include",
+        headers,
+      });
+
+      if (res.ok) {
+        const data: LedgerRecord[] = await res.json();
+        setLedgerHistory(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch transaction ledger history:", err);
+    } finally {
+      setIsLoadingLedger(false);
+    }
+  };
+
+  // Initial Fetch on Component Mount
+  useEffect(() => {
+    fetchLedger();
+  }, [token]);
 
   // Preset Handlers
   const applyPreset = (type: "routine" | "offshore" | "sanctioned") => {
@@ -159,6 +207,9 @@ export default function SimulatorPage() {
       }
 
       setResult(data as GatekeeperResponse);
+
+      // Real-time refresh of immutable ledger audit trail
+      await fetchLedger();
     } catch (err: unknown) {
       const message =
         err instanceof Error
@@ -224,8 +275,8 @@ export default function SimulatorPage() {
         </div>
       </header>
 
-      {/* Main Grid Canvas */}
-      <main className="max-w-7xl mx-auto px-6 sm:px-8 py-10 flex-1 w-full space-y-8 relative z-10">
+      {/* Main Flowing Grid Canvas */}
+      <main className="max-w-7xl mx-auto px-6 sm:px-8 py-10 flex-1 w-full space-y-10 relative z-10">
         {/* Hero & Preset Buttons */}
         <section className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -658,6 +709,142 @@ export default function SimulatorPage() {
             )}
           </div>
         </div>
+
+        {/* =====================================================================
+            Full-Width Live Transaction Audit Trail Ledger Table
+        ===================================================================== */}
+        <section className="bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[2.5rem] p-6 sm:p-8 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+            <div className="flex items-center space-x-3">
+              <div className="h-10 w-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-lg shadow-inner">
+                ⛓️
+              </div>
+              <div>
+                <div className="flex items-center space-x-2.5">
+                  <h2 className="text-lg sm:text-xl font-light text-white/95 tracking-tight">
+                    Immutable Audit Trail &amp; Ledger
+                  </h2>
+                  <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/25">
+                    PostgreSQL Live Sync
+                  </span>
+                </div>
+                <p className="text-xs text-white/50 font-light">
+                  Real-time transaction compliance logs with SHA-256 cryptographic verification digests.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <button
+                type="button"
+                onClick={fetchLedger}
+                disabled={isLoadingLedger}
+                className="text-xs px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-white/80 hover:text-white border border-white/15 backdrop-blur-xl transition-all duration-200 ease-out active:scale-95 flex items-center space-x-1.5 font-mono"
+              >
+                <span className={isLoadingLedger ? "inline-block animate-spin" : ""}>🔄</span>
+                <span>{isLoadingLedger ? "Syncing..." : "Refresh Ledger"}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Table Container */}
+          <div className="overflow-x-auto rounded-2xl border border-white/5 bg-black/30">
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="bg-white/[0.03] border-b border-white/10 text-white/50 uppercase tracking-wider text-[10px]">
+                <tr>
+                  <th className="py-3.5 px-4 font-medium">Timestamp (UTC)</th>
+                  <th className="py-3.5 px-4 font-medium">Transaction ID</th>
+                  <th className="py-3.5 px-4 font-medium">Verdict</th>
+                  <th className="py-3.5 px-4 font-medium">Risk Score</th>
+                  <th className="py-3.5 px-4 font-medium">SHA-256 Cryptographic Digest</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 text-white/80">
+                {ledgerHistory.length > 0 ? (
+                  ledgerHistory.map((item, idx) => {
+                    const isPass = item.verdict === "PASS";
+                    const formattedTime = item.timestamp
+                      ? new Date(item.timestamp).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                          hour12: false,
+                        })
+                      : "Just now";
+
+                    return (
+                      <tr
+                        key={item.id || item.transaction_id || idx}
+                        className="hover:bg-white/[0.02] transition-colors"
+                      >
+                        <td className="py-3.5 px-4 text-white/50 text-[11px] whitespace-nowrap">
+                          {formattedTime}
+                        </td>
+                        <td className="py-3.5 px-4 font-semibold text-white/90">
+                          {item.transaction_id}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span
+                            className={`inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              isPass
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25"
+                                : "bg-rose-500/10 text-rose-400 border border-rose-500/25"
+                            }`}
+                          >
+                            <span>{isPass ? "🟢" : "🔴"}</span>
+                            <span>{item.verdict}</span>
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span
+                            className={`font-bold ${
+                              item.risk_score > 75
+                                ? "text-rose-400"
+                                : item.risk_score > 30
+                                ? "text-amber-400"
+                                : "text-emerald-400"
+                            }`}
+                          >
+                            {item.risk_score} / 100
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-white/60">
+                          <div className="flex items-center space-x-2">
+                            <span className="truncate max-w-[200px] sm:max-w-[280px]">
+                              {item.sha256_hash}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                copyToClipboard(item.sha256_hash, `ledger_${idx}`)
+                              }
+                              className="text-[10px] px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-white transition-all duration-150 active:scale-95 shrink-0"
+                            >
+                              {copiedKey === `ledger_${idx}` ? "Copied" : "Copy"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="py-8 text-center text-white/40 text-xs font-light font-sans"
+                    >
+                      {isLoadingLedger
+                        ? "Loading audit ledger entries..."
+                        : "No evaluated transactions found. Dispatch a transaction above to create the first ledger entry."}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </main>
     </div>
   );
