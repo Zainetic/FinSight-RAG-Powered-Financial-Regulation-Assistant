@@ -14,7 +14,7 @@ from src.core.llm import get_gemini_llm
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))  # src/core
 PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))  # root workspace
 FAISS_INDEX_DIR = os.path.join(PROJECT_ROOT, "data", "faiss_index")
-DEFAULT_EMBEDDING_MODEL = os.getenv("GOOGLE_EMBEDDING_MODEL", "models/gemini-embedding-001")
+DEFAULT_EMBEDDING_MODEL = os.getenv("GOOGLE_EMBEDDING_MODEL", "models/gemini-embedding-2-preview")
 
 
 class NuclearLogger(BaseCallbackHandler):
