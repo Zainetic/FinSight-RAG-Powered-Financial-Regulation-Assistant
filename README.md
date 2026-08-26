@@ -1,44 +1,87 @@
-# ⚖️ FinSight — AI-Powered RegTech Compliance Gatekeeper
+# ⚖️ FinSight — AI-Powered RegTech Compliance Gatekeeper & Transaction Sandbox
 
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Next.js 16](https://img.shields.io/badge/Frontend-Next.js%2016-000000?style=flat&logo=next.js&logoColor=white)](https://nextjs.org)
 [![Multi-Tenancy](https://img.shields.io/badge/Architecture-B2B%20Multi--Tenant-blueviolet?style=flat)](#-multi-tenancy--rbac-architecture)
 [![JWT & RBAC](https://img.shields.io/badge/Security-JWT%20%2B%20RBAC-success?style=flat)](#-rbac-permission-matrix)
-[![LangChain](https://img.shields.io/badge/AI-LangChain%20RAG-1C3C3C?style=flat&logo=langchain&logoColor=white)](https://python.langchain.com)
+[![FAISS Vector Store](https://img.shields.io/badge/Vector%20Store-FAISS%20(8%20EU%20Acts)-0A85EA?style=flat)](https://github.com/facebookresearch/faiss)
 [![Google Gemini](https://img.shields.io/badge/LLM-Gemini%20Flash-4285F4?style=flat&logo=google&logoColor=white)](https://aistudio.google.com)
-[![PostgreSQL](https://img.shields.io/badge/Ledger-PostgreSQL%2016-4169E1?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org)
-[![Docker](https://img.shields.io/badge/Deployment-Docker%20Compose-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com)
+[![PostgreSQL 16](https://img.shields.io/badge/Ledger-PostgreSQL%2016-4169E1?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![Docker Compose](https://img.shields.io/badge/Deployment-Docker%20Compose-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com)
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](#-license--copyright)
 
-**FinSight** is an enterprise-grade Regulatory Technology (RegTech) platform and automated compliance gatekeeper built for B2B fintech ecosystems. It cross-references fintech software architectures, data flows, and machine learning deployments against regional regulatory frameworks (**EU AI Act 2024/1689**, **GDPR 2016/679**, **PSD2 2015/2366**, **UK DPA 2018**, and **US CCPA/CPRA**), sealing every audit determination into an immutable, cryptographic SHA-256 PostgreSQL ledger with multi-tenant row-level isolation and Role-Based Access Control (RBAC).
+**FinSight** is an enterprise-grade Regulatory Technology (RegTech) platform, multi-turn AI compliance auditor, and real-time transaction gatekeeper built for modern B2B fintech ecosystems. 
+
+It evaluates software architectures, tokenization mechanisms, payment rails, and transactional data flows against **8 European Union Regulatory Frameworks** (**EU AI Act 2024/1689**, **GDPR 2016/679**, **PSD2 RTS 2015/2366**, **MiCA 2023/1114**, **TFR Travel Rule 2023/1113**, **DORA 2022/2554**, **AMLD6 2018/1673**, and **AMLD5 2018/843**), sealing every audit determination into an immutable, cryptographic **SHA-256 PostgreSQL ledger** with tenant isolation and Role-Based Access Control (RBAC).
 
 ---
 
-## 🏛️ Key Capabilities
+## 🏛️ Key Capabilities & Features
 
-* **🏢 B2B Multi-Tenancy & Genesis Blocks**: Complete tenant isolation for enterprise clients. Each registered organization is automatically provisioned with a cryptographic **Genesis Block (`#0`)** from which all subsequent compliance hashes chain deterministically.
-* **🛡️ Role-Based Access Control (RBAC) & JWT Security**: High-security token authentication (`HS256`, `bcrypt`) with three strict permission tiers: `MASTER_ADMIN`, `MANAGER`, and `DEVELOPER`.
-* **⚡ Real-Time SSE Streaming**: Token-by-token streaming of executive legal analyses via Server-Sent Events (SSE), delivering immediate Time-To-First-Token (TTFT).
-* **🎯 Multi-Jurisdictional FAISS RAG**: Semantic vector retrieval with metadata filtering (`jurisdictions: ["EU", "UK", "US"]`) ensuring cross-regional legal accuracy.
-* **🔒 Tenant-Isolated SHA-256 Ledger**: Every compliance assessment is cryptographically linked to the previous transaction hash (`prev_hash`) within the organization's hash chain using deterministic canonical serialization.
-* **🧑‍⚖️ Human-in-the-Loop Dispute Protocol**: Compliance managers and admins can dispute high-risk determinations by appending an immutable override block (`OVERRIDDEN_BY_HUMAN`) without breaking hash-chain continuity. Developers are strictly blocked from overrides.
-* **🚀 DevSecOps CI/CD Gatekeeper Webhook**: Dedicated `POST /api/v1/scan-repo` endpoint for GitHub Actions that returns HTTP 200 for compliant architectures and HTTP 403 to block non-compliant PR merges.
-* **✨ Apple "Liquid Glass" Next.js UI**: Modern dark-mode interface featuring 50/50 split-screen login, organization onboarding, admin team provisioning, and conditional UI rendering that hides dispute triggers for developer roles.
+### 1. 🤖 3-State Agentic Auditing & Multi-Turn Memory
+* **Multi-Turn Conversational Thread**: Full conversational memory across multiple evaluation turns, allowing architects to provide iterative operational clarifications.
+* **Selectable Evaluation Modes**:
+  * 🛡️ **Auditor Mode (Strict)**: 3-state evaluation matrix across all 8 EU acts with `Pending Clarification` routing when operational controls are underspecified.
+  * ⚡ **Demo Mode (Lenient)**: Scope-limited evaluation focusing only on explicitly stated mechanisms.
+* **3-State Decision Badge Matrix**:
+  * 🟢 **Compliant Architecture** (`is_compliant=True`, `Minimal Risk`): All statutory technical requirements verified and satisfied.
+  * ⏳ **Pending Clarification** (`is_compliant=False`, `Pending Clarification`): Actionable technical and operational inquiries returned before final judgment.
+  * 🔴 **Action Required / High-Risk** (`is_compliant=False`, `High-Risk` / `Prohibited`): Active statutory breaches or prohibited classifications.
+
+### 2. ⚡ Real-Time FAISS Regulatory Transaction Gatekeeper
+* **Machine-to-Machine Sub-Second Screening**: Real-time evaluation of inbound financial transfers against AML/Sanctions rules, Travel Rule thresholds, and PSD2 SCA mandates.
+* **Zero-Trust PII Scrubbing**: Redacts sensitive originator/beneficiary personal names and IBANs while preserving routing parameters, amounts, and jurisdictions.
+* **Instant Sanctions Fast-Path**: 0ms bypass for international sanctions embargoes (`KP`, `IR`, `SY`).
+* **Interactive Live Simulator (`/simulator`)**: Web sandbox to dispatch test transactions (routine SEPA, offshore wires, sanctioned entities) and inspect live ingress vs. scrubbed payloads.
+
+### 3. 📚 Grounded Statutory Citations (8 EU Frameworks)
+* Unified **615-article FAISS vector store** covering all key EU Fintech & AI Acts.
+* Grounded citations extracted per turn with exact statutory document names, article numbers, and quoted legal excerpts.
+* Rendered via interactive collapsible `<details>` and `<summary>` accordions in both the main dashboard and simulator.
+
+### 4. 🏢 B2B Multi-Tenancy, Genesis Blocks & SHA-256 Ledger
+* **Tenant Hash Isolation**: Every registered organization receives a cryptographic **Genesis Block (`#0`, `prev_hash = "0"*64`)** from which all subsequent audit records chain deterministically.
+* **PostgreSQL Cryptographic Ledger Explorer Modal**: Elevated Apple Liquid Glass modal with truncated hashes (`8...8`), one-click clipboard copy, human-readable timestamps, and full cryptographic hash chain verification.
+* **🧑‍⚖️ Human-in-the-Loop Dispute Protocol**: Compliance managers and admins can dispute AI determinations by appending immutable override blocks (`OVERRIDDEN_BY_HUMAN`) without breaking chain continuity.
+
+### 5. 🔐 Role-Based Access Control (RBAC) & Security
+* Three strict permission tiers: `MASTER_ADMIN`, `MANAGER`, and `DEVELOPER`.
+* Developer roles can run evaluations and view ledger records but are strictly prohibited from dispute overrides and team management.
+* Admin Hard Deletion: Route `DELETE /api/v1/prompts/{audit_id}` allows admins to delete test prompts and audit records for privacy hygiene.
+
+---
+
+## 🇪🇺 Comprehensive 8 EU Regulatory Catalog
+
+FinSight's automated SPARQL ingestion and embedding pipeline (`eur_lex_fetcher.py` and `legal_embedder.py`) indexes the full statutory text of 8 core European regulations:
+
+| Acronym | Official EU Regulation / Directive | CELEX Identifier | Scope / Primary Focus |
+| :--- | :--- | :--- | :--- |
+| **EU AI ACT** | Regulation (EU) 2024/1689 | `32024R1689` | AI Risk Tiers, Prohibited Practices, High-Risk Conformance |
+| **GDPR** | Regulation (EU) 2016/679 | `32016R0679` | Data Protection, DPIA, Cross-Border Transfer Safeguards |
+| **MiCA** | Regulation (EU) 2023/1114 | `32023R1114` | Crypto-Asset Service Providers (CASP), Asset-Referenced & E-Money Tokens |
+| **PSD2** | Directive (EU) 2015/2366 | `32015L2366` | Payment Services Directive, Strong Customer Authentication (SCA), PISP/AISP |
+| **TFR** | Regulation (EU) 2023/1113 | `32023R1113` | Transfer of Funds Regulation (Crypto Travel Rule $\ge$ €1,000) |
+| **DORA** | Regulation (EU) 2022/2554 | `32022R2554` | Digital Operational Resilience Act, ICT Risk Management, Threat Testing |
+| **AMLD6** | Directive (EU) 2018/1673 | `32018L1673` | 6th Anti-Money Laundering Directive (Criminal Penalties & Sanctions) |
+| **AMLD5** | Directive (EU) 2018/843 | `32018L0843` | 5th Anti-Money Laundering Directive (Customer Due Diligence & Thresholds) |
 
 ---
 
 ## 🔐 RBAC Permission Matrix
 
-| Operation / Capability | Endpoint | `MASTER_ADMIN` | `MANAGER` | `DEVELOPER` |
+| Operation / Capability | Endpoint / Route | `MASTER_ADMIN` | `MANAGER` | `DEVELOPER` |
 | :--- | :--- | :---: | :---: | :---: |
 | **Register New Organization & Genesis Block** | `POST /api/v1/auth/register-org` | ✅ | ❌ | ❌ |
-| **Provision Team Users (`DEV`/`MGR`)** | `POST /api/v1/auth/create-user` | ✅ | ❌ | ❌ |
-| **Access Admin Team Management (`/admin`)** | Next.js `/admin` Route | ✅ | ❌ | ❌ |
-| **View Organization Members** | `GET /api/v1/auth/users` | ✅ | ✅ | ❌ |
+| **Provision Team Users (`DEV` / `MGR`)** | `POST /api/v1/auth/create-user` | ✅ | ❌ | ❌ |
+| **Admin Team Management Page** | Next.js `/admin` Route | ✅ | ❌ | ❌ |
+| **View Organization Team Members** | `GET /api/v1/auth/users` | ✅ | ✅ | ❌ |
 | **Run Streaming Compliance Audits** | `POST /api/v1/evaluate` | ✅ | ✅ | ✅ |
-| **View Tenant Cryptographic Ledger** | `GET /api/v1/ledger` | ✅ | ✅ | ✅ |
-| **Execute Human-in-the-Loop Override** | `POST /api/v1/override` | ✅ | ✅ | 🚫 *(HTTP 403 / Hidden in UI)* |
-| **CI/CD Repository Scan Webhook** | `POST /api/v1/scan-repo` | ✅ | ✅ | ✅ |
+| **Evaluate Transaction Gatekeeper** | `POST /api/v1/transactions/evaluate` | ✅ | ✅ | ✅ |
+| **View Ledger Explorer & History** | `GET /api/v1/ledger` | ✅ | ✅ | ✅ |
+| **Execute Human Dispute Override** | `POST /api/v1/override` | ✅ | ✅ | 🚫 *(HTTP 403 / Hidden in UI)* |
+| **Purge Sandbox Transaction Ledger** | `DELETE /api/v1/transactions/sandbox` | ✅ | ❌ | ❌ |
+| **Hard-Delete Audit Prompt** | `DELETE /api/v1/prompts/{audit_id}` | ✅ | ❌ | ❌ |
 
 ---
 
@@ -46,13 +89,13 @@
 
 ```mermaid
 flowchart TD
-    subgraph ClientLayer["🖥️ Frontend (Next.js 16 App Router) & CI/CD"]
-        AUTH_CTX["AuthContext & LocalStorage Session"]
+    subgraph ClientLayer["🖥️ Frontend (Next.js 16 App Router & Tailwind CSS)"]
+        AUTH_CTX["AuthContext & JWT Session"]
         LOGIN_UI["Split-Screen Login (/login)"]
         REG_UI["Organization Onboarding (/register)"]
         ADMIN_UI["Admin Team Management (/admin)"]
-        DASH_UI["Compliance Dashboard (/) [RBAC Conditional UI]"]
-        GHA["GitHub Actions CI/CD Pipeline"]
+        DASH_UI["Compliance Dashboard (/) [3-State Agentic UI]"]
+        SIM_UI["Transaction Gatekeeper Simulator (/simulator)"]
     end
 
     subgraph AuthLayer["🔑 Authentication & RBAC Middleware"]
@@ -61,26 +104,28 @@ flowchart TD
     end
 
     subgraph APILayer["⚡ FastAPI Gateway"]
-        AUTH_EP["POST /api/v1/auth (login, register-org, create-user, users)"]
-        EVAL_EP["POST /api/v1/evaluate (SSE Streaming)"]
-        SCAN_EP["POST /api/v1/scan-repo (CI/CD Webhook)"]
-        OVER_EP["POST /api/v1/override (Dispute Override)"]
+        AUTH_EP["POST /api/v1/auth (login, register-org, create-user)"]
+        EVAL_EP["POST /api/v1/evaluate (SSE Streaming + Multi-Turn)"]
+        TX_EP["POST /api/v1/transactions/evaluate (Sub-Second Gatekeeper)"]
+        OVER_EP["POST /api/v1/override (Dispute Protocol)"]
         LEDG_EP["GET /api/v1/ledger (Ledger Explorer)"]
+        DEL_EP["DELETE /api/v1/prompts/{audit_id} (Admin Hard Delete)"]
     end
 
-    subgraph RAGLayer["🧠 LangChain & Vector Engine"]
-        FAISS[("FAISS Vector Index\n(EUR-Lex, GDPR, AI Act, PSD2)")]
-        PROMPT["Strict 3-Tier Markdown Prompt"]
-        LLM["Google Gemini Flash LLM (astream)"]
-        HYDRATE["Context Citation Hydration Engine"]
+    subgraph RAGLayer["🧠 FAISS Vector Engine & Google Gemini Flash"]
+        FAISS[("FAISS Regulatory Vector Index\n(615 Articles across 8 EU Acts)")]
+        PROMPT["3-State Multi-Act System Prompt"]
+        LLM_AUDIT["Gemini Flash (Streaming Audit RAG)"]
+        LLM_FAST["Gemini Flash-Lite (Sub-Second Gatekeeper)"]
     end
 
     subgraph LedgerLayer["🔒 PostgreSQL Multi-Tenant Ledger"]
         ORGS[("organizations Table")]
-        USERS[("users Table (Bcrypt Hashed)")]
+        USERS[("users Table (Bcrypt)")]
         GENESIS["Genesis Block Generator (#0)"]
-        HASH["Deterministic SHA-256 Canonical Hasher"]
-        CHAIN[("compliance_ledger Table\n(org_id Scoped prev_hash -> tx_hash)")]
+        HASH["Deterministic SHA-256 Hasher"]
+        CHAIN[("compliance_ledger Table\n(org_id Scoped Hash Chain)")]
+        TX_CHAIN[("transaction_ledger Table\n(Immutable Audit Records)")]
     end
 
     LOGIN_UI -->|Authenticate| AUTH_EP
@@ -88,8 +133,8 @@ flowchart TD
     ADMIN_UI -->|Bearer JWT| AUTH_EP
     DASH_UI -->|Bearer JWT + Stream Query| EVAL_EP
     DASH_UI -->|Bearer JWT + Dispute| OVER_EP
-    DASH_UI -->|Bearer JWT + History| LEDG_EP
-    GHA -->|Audit Diff| SCAN_EP
+    DASH_UI -->|Bearer JWT + Ledger| LEDG_EP
+    SIM_UI -->|Bearer JWT + Transaction| TX_EP
 
     AUTH_EP --> ORGS
     AUTH_EP --> USERS
@@ -97,54 +142,62 @@ flowchart TD
     GENESIS --> CHAIN
 
     EVAL_EP --> JWT_GUARD
+    TX_EP --> JWT_GUARD
     OVER_EP --> JWT_GUARD
     OVER_EP --> ROLE_GUARD
     LEDG_EP --> JWT_GUARD
-    SCAN_EP --> JWT_GUARD
+    DEL_EP --> JWT_GUARD
+    DEL_EP --> ROLE_GUARD
 
-    JWT_GUARD --> EVAL_EP
     EVAL_EP --> FAISS
-    SCAN_EP --> FAISS
-    FAISS --> HYDRATE
-    HYDRATE --> PROMPT
-    PROMPT --> LLM
+    TX_EP --> FAISS
+    FAISS --> PROMPT
+    PROMPT --> LLM_AUDIT
+    PROMPT --> LLM_FAST
 
-    LLM -->|SSE Streaming Tokens| DASH_UI
-    LLM --> HASH
+    LLM_AUDIT -->|SSE Streaming Tokens| DASH_UI
+    LLM_FAST -->|JSON Response| SIM_UI
+    LLM_AUDIT --> HASH
+    LLM_FAST --> HASH
     OVER_EP --> HASH
-    SCAN_EP --> HASH
     HASH --> CHAIN
+    HASH --> TX_CHAIN
 ```
 
 ---
 
-## 📂 Monorepo Structure
+## 📂 Project Structure
 
 ```text
 FinSight/
-├── .github/
-│   └── workflows/
-│       └── compliance-gate.yml      # GitHub Actions automated PR compliance gate
 ├── backend/
 │   ├── data/
-│   │   ├── faiss_index/             # Pre-built FAISS vector index (index.faiss, index.pkl)
-│   │   └── raw_pdfs/                # EU AI Act, GDPR, and PSD2 source regulations
+│   │   ├── faiss_index/             # Unified 615-article FAISS vector store (index.faiss, index.pkl)
+│   │   └── raw_statutes/            # Clean downloaded statutory text for 8 EU Acts
 │   ├── src/
 │   │   ├── api/
 │   │   │   ├── auth.py              # Auth endpoints (/register-org, /login, /create-user, /users)
-│   │   │   ├── main.py              # FastAPI app definition, CORS, router mounting
-│   │   │   └── routes.py            # Protected SSE evaluation, dispute override, and CI/CD routes
+│   │   │   ├── main.py              # FastAPI app definition, CORS, security headers, lifespan
+│   │   │   ├── prompts.py           # Admin prompt management & hard-deletion endpoints
+│   │   │   ├── routes.py            # Multi-turn SSE evaluation, dispute override, and scan routes
+│   │   │   └── transactions.py      # Real-time transaction gatekeeper API & sandbox purge
 │   │   ├── core/
 │   │   │   ├── auth.py              # Bcrypt hashing, JWT generation/decoding, RBAC dependencies
 │   │   │   ├── database.py          # PostgreSQL multi-tenant DDL (organizations, users, ledger)
-│   │   │   ├── ledger.py            # Deterministic multi-tenant SHA-256 hash chaining & Genesis block
+│   │   │   ├── ledger.py            # Multi-tenant SHA-256 hash chaining & Genesis block
+│   │   │   ├── limiter.py           # SlowAPI rate limiting configuration
 │   │   │   ├── llm.py               # Singleton Gemini Flash LLM client
-│   │   │   └── rag.py               # Asynchronous streaming RAG & context hydration
-│   │   └── ingestion/
-│   │       └── build_index.py       # PDF ingestion & FAISS embedding generation script
-│   ├── test_multitenancy_rbac.py    # Integration test suite for Auth, RBAC, and Ledger isolation
+│   │   │   ├── models.py            # SQLAlchemy database models
+│   │   │   └── rag.py               # 3-State agentic RAG evaluation, SSE stream, and FAISS index
+│   │   ├── schemas/
+│   │   │   └── transaction.py       # Pydantic schemas for TransactionPayload and EvaluationResult
+│   │   └── services/
+│   │       ├── data_ingestion/
+│   │       │   ├── eur_lex_fetcher.py # SPARQL EUR-Lex fetcher for 8 EU Acts
+│   │       │   └── legal_embedder.py  # Chunking & FAISS index generation
+│   │       └── transactions.py      # Sub-second transaction compliance & zero-trust PII engine
 │   ├── Dockerfile                   # Python 3.13 + CPU-only PyTorch container
-│   └── requirements.txt             # Backend dependencies (passlib, bcrypt, PyJWT, email-validator)
+│   └── requirements.txt             # Backend dependencies
 ├── frontend/
 │   ├── app/
 │   │   ├── admin/
@@ -152,19 +205,20 @@ FinSight/
 │   │   ├── context/
 │   │   │   └── AuthContext.tsx      # React AuthContext & persistent localStorage JWT store
 │   │   ├── login/
-│   │   │   └── page.tsx             # 50/50 Split-Screen Login UI with video placeholder
+│   │   │   └── page.tsx             # 50/50 Split-Screen Login UI
 │   │   ├── register/
 │   │   │   └── page.tsx             # Organization Onboarding & Genesis Block registration
-│   │   ├── globals.css              # Tailwind CSS imports and typography plugins
+│   │   ├── simulator/
+│   │   │   └── page.tsx             # Real-time Transaction Gatekeeper Simulator & Zero-Trust Sandbox
+│   │   ├── globals.css              # Tailwind CSS v4 imports and custom scrollbar utilities
 │   │   ├── layout.tsx               # Root Next.js layout wrapped in AuthProvider
-│   │   └── page.tsx                 # Compliance dashboard with RBAC conditional rendering
+│   │   └── page.tsx                 # Main Compliance Dashboard with 3-State badge & collapsible citations
 │   ├── Dockerfile                   # Node.js 20 container definition
 │   ├── package.json                 # Next.js 16, React 19, ReactMarkdown dependencies
 │   └── tsconfig.json                # Strict TypeScript configuration
 ├── .env.example                     # Environment configuration template
 ├── .gitignore                       # Production git ignore configuration
-├── LICENSE                          # Proprietary and confidential license
-└── docker-compose.yml               # Multi-container orchestration (DB with healthcheck, API, Frontend)
+└── docker-compose.yml               # Multi-container orchestration (Postgres, API, Frontend)
 ```
 
 ---
@@ -187,14 +241,15 @@ FinSight/
    ```
 
 2. **Configure Environment Variables**:
-   Create a `.env` file in the root workspace:
+   Create a `.env` file in the root directory:
    ```bash
    cp .env.example .env
    ```
-   Configure your environment variables:
+   Set your actual credentials:
    ```env
    GOOGLE_API_KEY=your_actual_gemini_api_key
    GEMINI_MODEL=gemini-3.6-flash
+   GEMINI_TRANSACTION_MODEL=gemini-flash-lite-latest
    JWT_SECRET_KEY=your-super-secure-cryptographic-jwt-secret-key-2026
    POSTGRES_DB=finsight_db
    POSTGRES_USER=postgres
@@ -210,10 +265,11 @@ FinSight/
    ```
 
 4. **Access the Applications**:
-   * 🖥️ **Compliance Portal**: [http://localhost:3000](http://localhost:3000) *(Redirects to `/login`)*
-   * 🏢 **Register New Organization**: [http://localhost:3000/register](http://localhost:3000/register)
-   * ⚡ **FastAPI Interactive Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-   * 🗄️ **PostgreSQL Database**: `localhost:5432`
+   * 🖥️ **Compliance Dashboard**: [http://localhost:3000](http://localhost:3000)
+   * ⚡ **Transaction Gatekeeper Simulator**: [http://localhost:3000/simulator](http://localhost:3000/simulator)
+   * 🏢 **Register Organization**: [http://localhost:3000/register](http://localhost:3000/register)
+   * 📜 **FastAPI Interactive Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+   * 🗄️ **PostgreSQL Ledger**: `localhost:5432`
 
 ---
 
@@ -234,12 +290,13 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install dependencies (CPU-only PyTorch first)
+# Install CPU-only PyTorch first
 pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
 
-# Run integration test suite
-python test_multitenancy_rbac.py
+# (Optional) Rebuild FAISS index from 8 EU Acts
+python src/services/data_ingestion/eur_lex_fetcher.py
+python src/services/data_ingestion/legal_embedder.py
 
 # Start backend server
 uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
@@ -258,12 +315,11 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 📡 RESTful API Reference
 
-All protected endpoints require the HTTP header: `Authorization: Bearer <JWT_TOKEN>`.
+All protected endpoints require the header: `Authorization: Bearer <JWT_TOKEN>`.
 
 ### 1. Authentication Endpoints
 
 #### `POST /api/v1/auth/register-org` — Register Organization & Genesis Block
-Registers a new enterprise client, creates a `MASTER_ADMIN` user, and commits the initial Genesis Block (`#0`, `prev_hash = "0"*64`) for that organization.
 * **Request Body**:
   ```json
   {
@@ -272,134 +328,97 @@ Registers a new enterprise client, creates a `MASTER_ADMIN` user, and commits th
     "password": "SecureAdminPassword2026!"
   }
   ```
-* **Response (HTTP 201)**:
-  ```json
-  {
-    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6...",
-    "token_type": "bearer",
-    "expires_in": 86400,
-    "user": { "id": "fa8f2cbc...", "email": "admin@nordicpayments.se", "role": "MASTER_ADMIN", "org_id": "9a1b2c..." },
-    "organization": { "id": "9a1b2c...", "name": "Nordic Payments AB" },
-    "genesis_block": { "tx_hash": "2e0bb537...", "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000" }
-  }
-  ```
+* **Response (HTTP 201)**: Returns access token, user profile, and cryptographic Genesis Block (`#0`).
 
 #### `POST /api/v1/auth/login` — User Authentication
-Authenticates credentials against stored `bcrypt` password hashes and returns a signed JWT.
-* **Request Body**:
-  ```json
-  {
-    "email": "admin@nordicpayments.se",
-    "password": "SecureAdminPassword2026!"
-  }
-  ```
+* **Request Body**: `{"email": "...", "password": "..."}`
+* **Response (HTTP 200)**: Returns signed JWT access token and user metadata.
 
 #### `POST /api/v1/auth/create-user` — Provision Team Member (`MASTER_ADMIN` only)
-Allows a Master Admin to create `DEVELOPER` or `MANAGER` accounts under their organization.
-* **Request Body**:
-  ```json
-  {
-    "email": "developer@nordicpayments.se",
-    "password": "DeveloperPassword2026!",
-    "role": "DEVELOPER"
-  }
-  ```
+* **Request Body**: `{"email": "dev@nordicpayments.se", "password": "...", "role": "DEVELOPER"}`
 
 ---
 
-### 2. RegTech Compliance Endpoints
+### 2. Multi-Turn Compliance Engine
 
-#### `POST /api/v1/evaluate` — Stream Compliance Assessment (SSE)
-Executes real-time RAG evaluation against the FAISS vector database and commits the resulting assessment to the tenant's PostgreSQL ledger.
-* **Headers**: `Authorization: Bearer <token>`
+#### `POST /api/v1/evaluate` — Stream Multi-Turn Compliance Evaluation (SSE)
 * **Request Body**:
   ```json
   {
-    "query": "We are developing a cloud-hosted biometric facial recognition gateway to categorize retail banking users and authorize high-value payments automatically.",
-    "jurisdictions": ["EU (AI Act, GDPR, PSD2)"]
+    "query": "We are issuing an EMT token pegged to EUR with 100% reserve bank deposits in French credit institutions...",
+    "jurisdictions": ["EU (AI Act, GDPR, PSD2)"],
+    "history": [
+      {"role": "user", "content": "Initial proposal..."},
+      {"role": "assistant", "content": "Previous evaluation report..."}
+    ],
+    "mode": "strict"
   }
   ```
-* **Response**: `text/event-stream` delivering incremental tokens:
-  ```text
-  data: {"type": "start", "jurisdictions": ["EU (AI Act, GDPR, PSD2)"], "citations": [...]}
+* **Response**: `text/event-stream` delivering real-time tokens, grounded citations, and SHA-256 ledger confirmation.
 
-  data: {"type": "token", "content": "### 🚨 Risk Classification\n* **EU AI Act**: Prohibited..."}
-
-  data: {"type": "done", "audit_id": "7b8f9e...", "tx_hash": "a1b2c3...", "prev_hash": "2e0bb5...", "is_compliant": false}
-  ```
-
----
-
-#### `POST /api/v1/override` — Human-in-the-Loop Dispute (`MANAGER` & `MASTER_ADMIN`)
-Appends an immutable dispute block linked to the latest `tx_hash` in the tenant's chain. Returns **HTTP 403 Forbidden** if invoked by a `DEVELOPER`.
-* **Headers**: `Authorization: Bearer <token>`
+#### `POST /api/v1/override` — Human Dispute Override Protocol (`MANAGER` / `MASTER_ADMIN`)
 * **Request Body**:
   ```json
   {
     "audit_id": "7b8f9e...",
-    "justification": "Biometric processing is strictly localized on-device with zero cloud telemetry under GDPR Art. 9(2)(a) explicit consent."
+    "justification": "Processing falls strictly under GDPR Art. 9(2)(a) explicit consent with localized on-device processing."
   }
   ```
-* **Response (HTTP 200)**:
-  ```json
-  {
-    "audit_id": "8c9a1b...",
-    "original_audit_id": "7b8f9e...",
-    "org_id": "9a1b2c...",
-    "status": "OVERRIDDEN_BY_HUMAN",
-    "prev_hash": "a1b2c3...",
-    "tx_hash": "d4e5f6...",
-    "timestamp": "2026-08-22T02:00:00Z"
-  }
-  ```
+* **Response (HTTP 200)**: Appends immutable dispute block (`OVERRIDDEN_BY_HUMAN`) to the organization's hash chain.
 
 ---
 
-#### `GET /api/v1/ledger` — Inspect Tenant Ledger & Verify Integrity
-Fetches the 10 most recent blocks for the caller's organization and executes a full cryptographic verification of the organization's hash chain.
-* **Headers**: `Authorization: Bearer <token>`
-* **Response (HTTP 200)**:
-  ```json
-  {
-    "org_id": "9a1b2c...",
-    "total": 10,
-    "chain_valid": true,
-    "total_blocks_verified": 10,
-    "verification_error": null,
-    "blocks": [
-      {
-        "audit_id": "8c9a1b...",
-        "user_query": "...",
-        "prev_hash": "a1b2c3...",
-        "tx_hash": "d4e5f6...",
-        "timestamp": "2026-08-22T02:00:00Z"
-      }
-    ]
-  }
-  ```
+### 3. Real-Time Transaction Gatekeeper
 
----
-
-#### `POST /api/v1/scan-repo` — CI/CD Automated Webhook
-Acts as a compliance gate in GitHub Actions. Evaluates pull request diffs and returns HTTP 200 for compliant proposals or HTTP 403 to block PR merging.
-* **Headers**: `Authorization: Bearer <token>`
+#### `POST /api/v1/transactions/evaluate` — Sub-Second Transaction Compliance
 * **Request Body**:
   ```json
   {
-    "repo_name": "fintech-corp/payments-service",
-    "commit_hash": "9f8a3c2b1d0e4f5a6b7c8d9e0f1a2b3c4d5e6f7a",
-    "architecture_changes": "Added automated facial biometrics for user credit profiling."
+    "transaction_id": "TX-2026-948172",
+    "amount": 2450.00,
+    "currency": "EUR",
+    "originator_country": "FR",
+    "beneficiary_country": "FR",
+    "payment_method": "SEPA_INSTANT",
+    "sca_authenticated": true,
+    "asset_type": "FIAT"
   }
   ```
+* **Response (HTTP 200)**:
+  ```json
+  {
+    "transaction_id": "TX-2026-948172",
+    "verdict": "APPROVED",
+    "risk_score": 0.05,
+    "is_compliant": true,
+    "primary_violations": [],
+    "applicable_regulations": ["PSD2 Art. 97", "AMLD6"],
+    "audit_rationale": "Transfer is fully compliant with EU statutory regulations as SCA is authenticated and amount is valid.",
+    "citations": [
+      {
+        "document": "PSD2 Directive (EU) 2015/2366",
+        "page": "Article 97",
+        "quoted_text": "Payment service providers shall apply strong customer authentication where the payer initiates an electronic payment transaction."
+      }
+    ],
+    "sha256_audit_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+  ```
+
+#### `GET /api/v1/transactions/ledger` — Transaction Ledger History
+* Returns the most recent 50 evaluated transaction records with SHA-256 digests.
+
+#### `DELETE /api/v1/transactions/sandbox` — Purge Sandbox Data (`ADMIN` only)
+* Clears all simulated sandbox transaction records.
 
 ---
 
 ## 🛡️ Security & Cryptographic Invariants
 
-* **Tenant Cryptographic Isolation**: Canonical SHA-256 hashing includes `org_id` in serialized JSON payloads, ensuring hash blocks between different organizations never collide.
+* **Tenant Cryptographic Isolation**: Canonical SHA-256 serialization binds `org_id` into every audit block, ensuring cross-tenant hash collisions are mathematically impossible.
 * **Zero Cloud Data Leakage**: Vector embeddings run locally via `sentence-transformers/all-MiniLM-L6-v2` on CPU.
-* **Deterministic Hasher**: Canonical key sorting and strict whitespace separators guarantee identical hashes for identical inputs across platforms.
-* **Append-Only Immutability**: All compliance audits and overrides are `INSERT`-only rows with PostgreSQL table-level locking to prevent race conditions or ledger forks.
+* **Deterministic Hasher**: Canonical key sorting and strict JSON whitespace separators guarantee identical hashes for identical inputs across environments.
+* **Append-Only Immutability**: All compliance audits and dispute overrides are `INSERT`-only rows with PostgreSQL table-level locking to prevent race conditions or ledger forks.
 
 ---
 
