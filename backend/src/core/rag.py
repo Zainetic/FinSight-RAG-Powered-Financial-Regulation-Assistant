@@ -266,14 +266,14 @@ def _calculate_token_overlap(fragment: str, document_text: str) -> float:
 def format_markdown_report(text: str) -> str:
     """
     Normalizes markdown formatting to ensure proper header hierarchy, line breaks,
-    and list structure for clean UI rendering.
+    and list structure for clean UI rendering without excessive blank lines.
     """
     if not text:
         return ""
     t = text.replace("\r\n", "\n").replace("\\n", "\n")
-    t = re.sub(r'(?<!\n)\s*(#{1,6}\s+)', r'\n\n\1', t)
-    t = re.sub(r'(?<!\n)\s*([*•-]\s+)', r'\n\n\1', t)
-
+    # Ensure headings have single blank line separation
+    t = re.sub(r'(?<!\n)\s*(#{1,6}\s+)', r'\n\1', t)
+    
     lines = t.split("\n")
     formatted_lines = []
     for line in lines:
@@ -286,7 +286,7 @@ def format_markdown_report(text: str) -> str:
             if match:
                 heading_part = match.group(1).strip()
                 body_part = match.group(2).strip()
-                formatted_lines.append(f"{heading_part}\n\n{body_part}")
+                formatted_lines.append(f"{heading_part}\n{body_part}")
                 continue
         formatted_lines.append(line)
 
