@@ -90,16 +90,15 @@ class ComplianceCitation(BaseModel):
 class ComplianceJudgment(BaseModel):
     risk_category: str = Field(
         description=(
-            "Global risk classification across all 8 EU financial and AI acts (AMLD, PSD2, MiCA, DORA, AI Act, GDPR). "
-            "Must strictly be one of: 'Prohibited', 'High-Risk', 'Specific Transparency', 'Minimal Risk', or 'Pending Clarification'. "
-            "If ANY law is violated, escalate to 'High-Risk' or 'Prohibited'. "
-            "If critical mandatory information is missing to make a determination, use 'Pending Clarification'."
+            "Must be strictly 'Minimal Risk' if the architecture satisfies the statutory technical requirements or is 'Compliant with Controls'. "
+            "Use 'High-Risk' or 'Prohibited' ONLY if there is an explicit legal violation. "
+            "Use 'Pending Clarification' if critical mandatory information is missing to make a determination."
         )
     )
     is_compliant: bool = Field(
         description=(
-            "Strictly True ONLY if the architecture is fully verified and compliant with ALL applicable EU laws across the conversational context. "
-            "Must be False for any violation, high-risk status, or if status is 'Pending Clarification'."
+            "Set strictly to True if there are NO active legal violations or missing mandatory technical controls. "
+            "Ongoing operational recommendations (like periodic DPIA reviews or continuous monitoring) DO NOT make an architecture non-compliant; mark is_compliant=True."
         )
     )
     citations: List[ComplianceCitation] = Field(
@@ -367,6 +366,7 @@ def build_system_prompt(jurisdiction_str: str, mode: str = "strict") -> str:
             "SCOPE LIMITATION (DEMO MODE):\n"
             "Evaluate ONLY the technical mechanisms explicitly stated in the query. Do NOT fail or penalize the architecture for omitted operational or administrative obligations "
             "(e.g., insurance, regulatory reporting schedules, continuous audit testing). Assume unstated operational requirements are satisfied.\n\n"
+            "- COMPLIANCE DETERMINATION RULE: When all technical mechanisms satisfy applicable EU regulations (even if ongoing governance best practices or periodic reviews are recommended), you MUST classify the risk as 'Minimal Risk' and set 'is_compliant=True'.\n\n"
             "MANDATORY OUTPUT STRUCTURE:\n"
             "### 🚨 Risk Classification\n"
             "* **EU AI Act**: [Prohibited / High-Risk / Specific Transparency / Minimal Risk] - [1-sentence justification citing Article/Annex]\n"
@@ -382,6 +382,7 @@ def build_system_prompt(jurisdiction_str: str, mode: str = "strict") -> str:
             "STRICT AGENTIC AUDITOR MODE - 3-STATE DECISION MATRIX:\n"
             "You MUST evaluate the cumulative architectural specification across the entire dialogue against all 8 EU acts (AMLD, PSD2, MiCA, TFR, DORA, AI Act, GDPR).\n"
             "You MUST choose and output EXACTLY ONE of the following 3 paths based on the evidence:\n\n"
+            "- COMPLIANCE DETERMINATION RULE: When all technical mechanisms satisfy applicable EU regulations (even if ongoing governance best practices or periodic reviews are recommended), you MUST classify the risk as 'Minimal Risk' and set 'is_compliant=True'.\n\n"
             "═══════════════════════════════════════════════════════════════════════════════\n"
             "PATH 1: EXPLICIT VIOLATION (Instant Fail)\n"
             "Condition: The architecture contains an active legal or technical breach (e.g., prohibited biometric emotion scoring, unauthorized EMT algorithmic yield, unauthenticated payment APIs, unauthorized personal data transfer).\n"
