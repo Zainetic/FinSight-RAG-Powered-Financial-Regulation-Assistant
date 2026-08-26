@@ -677,10 +677,10 @@ export default function ComplianceDashboard() {
                     </span>
                   </div>
                   {msg.role === "user" ? (
-                    <p className="whitespace-pre-wrap font-light">{msg.content}</p>
+                    <p className="whitespace-pre-wrap font-light text-indigo-100/90">{msg.content}</p>
                   ) : (
-                    <div className="whitespace-pre-wrap font-light text-white/85 prose prose-invert prose-xs max-w-none">
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    <div className="font-light text-white/90 prose prose-invert prose-sm max-w-none prose-p:my-1.5 prose-p:leading-relaxed prose-headings:my-2 prose-headings:text-white/95 prose-headings:font-medium prose-headings:text-base prose-ul:my-1.5 prose-ul:space-y-1 prose-li:my-0.5 prose-strong:text-white">
+                      <ReactMarkdown>{msg.content.replace(/\n{3,}/g, "\n\n").trim()}</ReactMarkdown>
                     </div>
                   )}
                 </div>
