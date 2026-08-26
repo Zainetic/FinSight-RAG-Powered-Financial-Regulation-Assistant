@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
@@ -103,8 +103,9 @@ export default function ComplianceDashboard() {
   const { user, token, isAuthenticated, isLoading: isAuthLoading, logout } = useAuth();
   const router = useRouter();
 
-  // Input State
+  // Input & Ref State
   const [query, setQuery] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [selectedJurisdictions, setSelectedJurisdictions] = useState<string[]>([
     "EU (AI Act, GDPR, PSD2)",
   ]);
@@ -389,12 +390,26 @@ export default function ComplianceDashboard() {
     }
   };
 
-  // Reset Conversational Thread
-  const handleResetConversation = () => {
+  // Continue Chat: Clear input and focus textarea
+  const handleContinueChat = () => {
+    setQuery("");
+    if (textareaRef.current) {
+      textareaRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      textareaRef.current.focus();
+    }
+  };
+
+  // Reset Chat: Clear all conversation history, results, and query
+  const handleResetChat = () => {
     setMessages([]);
     setResult(null);
     setErrorMessage(null);
     setQuery("");
+    setOverrideResult(null);
+    setOverrideError(null);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
   };
 
   // Submit Human Override
@@ -640,33 +655,34 @@ export default function ComplianceDashboard() {
         {/* Multi-Turn Conversation Thread (If Present) */}
         {messages.length > 0 && (
           <section className="bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[2.5rem] p-6 sm:p-8 space-y-4">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center space-x-2.5">
-                <span className="text-lg">💬</span>
-                <h3 className="text-base font-light text-white/95">Conversational Audit Thread ({messages.length / 2} Turns)</h3>
-              </div>
-              <button
-                onClick={handleResetConversation}
-                className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 text-xs font-medium transition-all active:scale-95 flex items-center space-x-1.5"
-              >
-                <span>🔄</span>
-                <span>Reset Conversation Thread</span>
-              </button>
+            <div className="flex items-center space-x-2.5 border-b border-white/10 pb-3">
+              <span className="text-lg">💬</span>
+              <h3 className="text-base font-light text-white/95">
+                Conversational Audit Thread ({Math.ceil(messages.length / 2)} Turns)
+              </h3>
             </div>
-            <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+            <div className="space-y-4 max-h-96 overflow-y-auto pr-3 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
               {messages.map((msg, idx) => (
                 <div
                   key={idx}
-                  className={`p-3.5 rounded-2xl text-xs leading-relaxed ${
+                  className={`p-4 sm:p-5 rounded-3xl text-xs sm:text-sm leading-relaxed transition-all duration-200 ${
                     msg.role === "user"
-                      ? "bg-indigo-500/10 border border-indigo-500/20 text-indigo-200 ml-6"
-                      : "bg-white/[0.03] border border-white/5 text-white/80 mr-6"
+                      ? "bg-indigo-500/15 border border-indigo-500/30 text-indigo-100 ml-4 sm:ml-12 shadow-sm"
+                      : "bg-black/40 border border-white/10 text-white/90 mr-4 sm:mr-12 shadow-inner"
                   }`}
                 >
-                  <span className="font-semibold block mb-1 font-mono text-[10px] uppercase text-white/40">
-                    {msg.role === "user" ? "👤 Architect Submission" : "⚖️ FinSight Auditor Response"}
-                  </span>
-                  <p className="line-clamp-2">{msg.content}</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold font-mono text-[11px] uppercase tracking-wider text-white/50 flex items-center space-x-1.5">
+                      <span>{msg.role === "user" ? "👤 Architect Submission" : "⚖️ FinSight Auditor Report"}</span>
+                    </span>
+                  </div>
+                  {msg.role === "user" ? (
+                    <p className="whitespace-pre-wrap font-light">{msg.content}</p>
+                  ) : (
+                    <div className="whitespace-pre-wrap font-light text-white/85 prose prose-invert prose-xs max-w-none">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -752,6 +768,7 @@ export default function ComplianceDashboard() {
           <form onSubmit={handleEvaluate} className="space-y-6">
             <div className="relative">
               <textarea
+                ref={textareaRef}
                 rows={5}
                 required
                 value={query}
@@ -791,12 +808,12 @@ export default function ComplianceDashboard() {
               </div>
             </div>
 
-            {/* Submit Action */}
-            <div className="pt-2 flex items-center justify-between">
+            {/* Submit & Action Buttons Area */}
+            <div className="pt-2 flex flex-wrap items-center gap-3">
               <button
                 type="submit"
                 disabled={isLoading || !query.trim()}
-                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white hover:bg-white/90 text-slate-950 font-medium text-sm transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 shadow-[0_4px_20px_0_rgba(255,255,255,0.2)] active:scale-95"
+                className="px-8 py-4 rounded-2xl bg-white hover:bg-white/90 text-slate-950 font-medium text-sm transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 shadow-[0_4px_20px_0_rgba(255,255,255,0.2)] active:scale-95"
               >
                 {isLoading ? (
                   <>
@@ -806,10 +823,39 @@ export default function ComplianceDashboard() {
                 ) : (
                   <>
                     <span>⚡</span>
-                    <span>Run Streaming Compliance Evaluation</span>
+                    <span>
+                      {messages.length > 0 ? "Send Follow-up Clarification" : "Run Streaming Compliance Evaluation"}
+                    </span>
                   </>
                 )}
               </button>
+
+              {/* Conditional Continuation & Reset Action Buttons */}
+              {(messages.length > 0 || result !== null) && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleContinueChat}
+                    disabled={isLoading}
+                    className="px-6 py-4 rounded-2xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 border border-indigo-500/30 font-medium text-sm transition-all duration-200 ease-out flex items-center space-x-2 shadow-sm active:scale-95"
+                    title="Clear input and focus textarea to provide follow-up architectural clarifications"
+                  >
+                    <span>💬</span>
+                    <span>Continue Chat</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleResetChat}
+                    disabled={isLoading}
+                    className="px-6 py-4 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/25 font-medium text-sm transition-all duration-200 ease-out flex items-center space-x-2 shadow-sm active:scale-95"
+                    title="Clear all conversation history and start a fresh compliance evaluation"
+                  >
+                    <span>🔄</span>
+                    <span>Reset Chat</span>
+                  </button>
+                </>
+              )}
             </div>
           </form>
 
