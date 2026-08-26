@@ -16,6 +16,11 @@ interface Citation {
   quoted_text: string;
 }
 
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 interface EvaluateResponse {
   audit_id: string;
   org_id?: string;
@@ -70,23 +75,27 @@ interface LedgerResponse {
 }
 
 const AVAILABLE_JURISDICTIONS = [
-  { id: "EU (AI Act, GDPR, PSD2)", label: "EU Regulations", desc: "EU AI Act, GDPR Art. 9/22, PSD2 RTS" },
+  { id: "EU (AI Act, GDPR, PSD2)", label: "EU Regulations", desc: "EU AI Act, GDPR, PSD2 RTS, MiCA, DORA" },
   { id: "UK (UK GDPR, Data Protection Act)", label: "UK Framework", desc: "Data Protection Act 2018, FCA AI Guidance" },
   { id: "US (CCPA/CPRA, SEC AI Guidance)", label: "US Framework", desc: "CCPA/CPRA, NIST AI RMF, SEC Guidance" },
 ];
 
 const PRESET_QUERIES = [
   {
-    title: "Biometric Payment Authorization",
+    title: "Biometric Payment Gateway",
     query: "We are developing a cloud-hosted biometric facial recognition gateway to categorize retail banking users and authorize high-value transactions automatically without human intervention.",
   },
   {
-    title: "AI Credit Scoring Engine",
-    query: "Deploying a machine learning model that analyzes social media activity and utility payment histories to compute automated creditworthiness scores for loan applications.",
+    title: "Crypto E-Money Token (MiCA)",
+    query: "We are issuing an EMT token pegged to EUR with 100% reserve bank deposits held in ACPR-supervised French credit institutions and zero interest paid to token holders.",
   },
   {
-    title: "Automated Fraud Anomaly Detection",
-    query: "Real-time payment transaction monitoring system utilizing behavioral telemetry to flag and freeze suspicious PSD2 open banking transactions with human compliance officer review.",
+    title: "Payment Initiation (PSD2 RTS)",
+    query: "Implementing a PSD2 Payment Initiation Service (PIS) with dynamic linking for transaction amounts and Strong Customer Authentication (SCA) via Open Banking REST APIs.",
+  },
+  {
+    title: "AI Credit Scoring (EU AI Act)",
+    query: "Deploying a machine learning model that analyzes social media activity and utility payment histories to compute automated creditworthiness scores for loan applications.",
   },
 ];
 
@@ -99,6 +108,10 @@ export default function ComplianceDashboard() {
   const [selectedJurisdictions, setSelectedJurisdictions] = useState<string[]>([
     "EU (AI Act, GDPR, PSD2)",
   ]);
+
+  // Conversational Memory & Evaluation Mode
+  const [evalMode, setEvalMode] = useState<"strict" | "lenient">("strict");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   // Execution & UI State
   const [isLoading, setIsLoading] = useState(false);
@@ -187,6 +200,15 @@ export default function ComplianceDashboard() {
     const risk = typeof payload.risk_category === "string" ? payload.risk_category : "";
     const isCompliant = payload.is_compliant === true;
 
+    if (risk.toLowerCase().includes("pending")) {
+      return (
+        <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/20">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+          <span>Pending Clarification</span>
+        </span>
+      );
+    }
+
     if (risk.toLowerCase().includes("prohibited") || risk.toLowerCase().includes("high")) {
       return (
         <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-rose-500/10 text-rose-300 border border-rose-500/20">
@@ -218,6 +240,7 @@ export default function ComplianceDashboard() {
     if (e) e.preventDefault();
     if (!query.trim() || !token || isLoading) return;
 
+    const currentQuery = query.trim();
     setIsLoading(true);
     setErrorMessage(null);
     setOverrideResult(null);
@@ -237,6 +260,13 @@ export default function ComplianceDashboard() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      
+      // Prepare multi-turn conversation history (excluding the prompt currently being sent)
+      const currentHistory = messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
       const res = await fetch(`${apiUrl}/api/v1/evaluate`, {
         method: "POST",
         credentials: "include",
@@ -245,8 +275,10 @@ export default function ComplianceDashboard() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          query: query.trim(),
+          query: currentQuery,
           jurisdictions: selectedJurisdictions,
+          history: currentHistory,
+          mode: evalMode,
         }),
       });
 
@@ -262,6 +294,7 @@ export default function ComplianceDashboard() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder("utf-8");
       let streamBuffer = "";
+      let accumulatedSummary = "";
 
       while (true) {
         const { value, done } = await reader.read();
@@ -306,6 +339,7 @@ export default function ComplianceDashboard() {
                     : (payload.content?.text || payload.content?.content || "");
 
                 if (tokenString) {
+                  accumulatedSummary += tokenString;
                   setResult((prev) => {
                     if (!prev) return prev;
                     return {
@@ -316,6 +350,7 @@ export default function ComplianceDashboard() {
                   });
                 }
               } else if (payload.type === "done") {
+                const finalSummary = payload.executive_summary_markdown || accumulatedSummary;
                 setResult({
                   audit_id: payload.audit_id || "LOCAL_COMMITTED",
                   tx_hash: payload.tx_hash || "NO_TX_HASH",
@@ -325,8 +360,15 @@ export default function ComplianceDashboard() {
                   is_compliant: payload.is_compliant ?? true,
                   citations: payload.citations || [],
                   jurisdictions: payload.jurisdictions || selectedJurisdictions,
-                  executive_summary_markdown: payload.executive_summary_markdown || "",
+                  executive_summary_markdown: finalSummary,
                 });
+
+                // Commit turn to multi-turn conversation history
+                setMessages((prev) => [
+                  ...prev,
+                  { role: "user", content: currentQuery },
+                  { role: "assistant", content: finalSummary },
+                ]);
               } else if (payload.type === "error") {
                 setErrorMessage(payload.detail || "An error occurred during evaluation.");
               }
@@ -345,6 +387,14 @@ export default function ComplianceDashboard() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Reset Conversational Thread
+  const handleResetConversation = () => {
+    setMessages([]);
+    setResult(null);
+    setErrorMessage(null);
+    setQuery("");
   };
 
   // Submit Human Override
@@ -440,7 +490,6 @@ export default function ComplianceDashboard() {
         throw new Error(errorData.detail || `Server returned HTTP ${res.status}`);
       }
 
-      // Remove item from UI state
       if (ledgerData) {
         setLedgerData({
           ...ledgerData,
@@ -453,9 +502,6 @@ export default function ComplianceDashboard() {
       alert(msg);
     }
   };
-
-
-
 
   if (isAuthLoading || !isAuthenticated) {
     return (
@@ -527,7 +573,7 @@ export default function ComplianceDashboard() {
               <span className="font-medium">Live Simulator</span>
             </Link>
 
-            {/* Admin Team Mgmt Link (Master Admin Only) */}
+            {/* Admin Team Mgmt Link */}
             {user?.role === "MASTER_ADMIN" && (
               <Link
                 href="/admin"
@@ -556,24 +602,22 @@ export default function ComplianceDashboard() {
         </div>
       </header>
 
-
-      {/* Main Single-Column Flowing Canvas */}
+      {/* Main Flowing Canvas */}
       <main className="max-w-5xl mx-auto px-6 sm:px-8 py-14 flex-1 w-full space-y-14 relative z-10">
         {/* Hero Banner */}
         <section className="text-center space-y-5 max-w-3xl mx-auto">
           <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-white/70 backdrop-blur-xl shadow-inner">
             <span>⚡</span>
-            <span>Real-Time SSE Streaming Compliance Engine</span>
+            <span>Real-Time Multi-Turn Agentic Compliance Auditor</span>
           </div>
           <h1 className="text-4xl sm:text-5xl font-light tracking-tight text-white/95 leading-tight">
             Cross-examine Fintech Architecture <br className="hidden sm:inline" />
-            Against Regional Regulations.
+            Against 8 EU Regulatory Frameworks.
           </h1>
           <p className="text-sm sm:text-base text-white/60 font-light max-w-2xl mx-auto leading-relaxed">
-            Instant streaming evaluation against the EU AI Act, GDPR, and PSD2 with SHA-256 immutable ledger audit tracking.
+            Streaming evaluation against AMLD6/5, PSD2, MiCA, TFR, DORA, EU AI Act, and GDPR with full multi-turn conversational memory.
           </p>
 
-          {/* Primary & Secondary Hero CTAs */}
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <a
               href="#architectural-evaluator"
@@ -593,7 +637,43 @@ export default function ComplianceDashboard() {
           </div>
         </section>
 
-        {/* Section A: The Architectural Input */}
+        {/* Multi-Turn Conversation Thread (If Present) */}
+        {messages.length > 0 && (
+          <section className="bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[2.5rem] p-6 sm:p-8 space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <span className="text-lg">💬</span>
+                <h3 className="text-base font-light text-white/95">Conversational Audit Thread ({messages.length / 2} Turns)</h3>
+              </div>
+              <button
+                onClick={handleResetConversation}
+                className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 text-xs font-medium transition-all active:scale-95 flex items-center space-x-1.5"
+              >
+                <span>🔄</span>
+                <span>Reset Conversation Thread</span>
+              </button>
+            </div>
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+              {messages.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={`p-3.5 rounded-2xl text-xs leading-relaxed ${
+                    msg.role === "user"
+                      ? "bg-indigo-500/10 border border-indigo-500/20 text-indigo-200 ml-6"
+                      : "bg-white/[0.03] border border-white/5 text-white/80 mr-6"
+                  }`}
+                >
+                  <span className="font-semibold block mb-1 font-mono text-[10px] uppercase text-white/40">
+                    {msg.role === "user" ? "👤 Architect Submission" : "⚖️ FinSight Auditor Response"}
+                  </span>
+                  <p className="line-clamp-2">{msg.content}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Section A: The Architectural Input & Mode Selection */}
         <section id="architectural-evaluator" className="bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[2.5rem] p-8 sm:p-12 space-y-8 relative overflow-hidden transition-all duration-200 scroll-mt-28">
 
           <div className="space-y-2">
@@ -602,8 +682,52 @@ export default function ComplianceDashboard() {
               <span>Architectural Specification</span>
             </h2>
             <p className="text-sm text-white/60 font-light leading-relaxed">
-              Describe your proposed data flow, AI models, or transaction infrastructure for high-speed streaming compliance analysis.
+              Describe your proposed data flows, licensing models, ICT topology, or transaction infrastructure for high-speed streaming compliance analysis.
             </p>
+          </div>
+
+          {/* 1. Evaluation Mode Toggle */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-3xl bg-black/30 border border-white/10 backdrop-blur-md">
+            <div className="space-y-1">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-medium text-white/95">Auditor Evaluation Mode</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/70 font-mono">
+                  {evalMode === "strict" ? "3-State Matrix" : "Scope-Limited"}
+                </span>
+              </div>
+              <p className="text-xs text-white/50 font-light">
+                {evalMode === "strict"
+                  ? "Enforces strict 3-state agentic auditing across all 8 EU acts with 'Pending Clarification' routing."
+                  : "Scope-limited demo mode evaluating only explicitly stated mechanisms without administrative penalties."}
+              </p>
+            </div>
+
+            <div className="inline-flex p-1 rounded-2xl bg-black/60 border border-white/10 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setEvalMode("strict")}
+                className={`px-4 py-2 rounded-xl text-xs font-medium transition-all duration-200 flex items-center space-x-2 ${
+                  evalMode === "strict"
+                    ? "bg-indigo-600 text-white shadow-[0_0_20px_0_rgba(99,102,241,0.4)]"
+                    : "text-white/50 hover:text-white"
+                }`}
+              >
+                <span>🛡️</span>
+                <span>Auditor (Strict)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setEvalMode("lenient")}
+                className={`px-4 py-2 rounded-xl text-xs font-medium transition-all duration-200 flex items-center space-x-2 ${
+                  evalMode === "lenient"
+                    ? "bg-purple-600 text-white shadow-[0_0_20px_0_rgba(168,85,247,0.4)]"
+                    : "text-white/50 hover:text-white"
+                }`}
+              >
+                <span>⚡</span>
+                <span>Demo (Lenient)</span>
+              </button>
+            </div>
           </div>
 
           {/* Quick Preset Queries */}
@@ -632,7 +756,7 @@ export default function ComplianceDashboard() {
                 required
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="e.g., We are building a payment gateway that categorizes users based on biometric facial recognition for instant loan approval..."
+                placeholder="e.g., We are issuing an EUR-referenced e-money token under MiCA with 100% reserve assets held in separate French banking accounts..."
                 className="w-full bg-black/30 border border-white/10 rounded-3xl p-6 text-sm sm:text-base text-white/90 placeholder-white/30 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md transition-all duration-200 ease-out resize-y leading-relaxed font-light shadow-inner"
               />
             </div>
@@ -677,7 +801,7 @@ export default function ComplianceDashboard() {
                 {isLoading ? (
                   <>
                     <span className="inline-block animate-spin">⏳</span>
-                    <span>Processing Compliance Evaluation...</span>
+                    <span>Streaming 3-State Agentic Audit...</span>
                   </>
                 ) : (
                   <>
@@ -700,32 +824,56 @@ export default function ComplianceDashboard() {
         {/* Section B: The Compliance Evaluation Results Canvas */}
         {result && (
           <div className="space-y-12 animate-in fade-in duration-300">
-            {/* 1. High-Impact Status Hero Metric Banner */}
+            {/* 1. 3-State Compliance Badge UI */}
             <section className="bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[2.5rem] p-8 sm:p-12 flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative overflow-hidden">
               <div className="space-y-2">
                 <div className="text-xs uppercase tracking-wider text-white/40 font-mono">
-                  Primary Determination
+                  Primary Audit Determination
                 </div>
                 <div className="flex items-center space-x-4">
+                  {/* State 1: Fully Compliant */}
                   {result.is_compliant ? (
                     <div className="flex items-center space-x-3">
                       <span className="text-3xl sm:text-4xl">🟢</span>
-                      <h2 className="text-3xl sm:text-4xl font-light text-emerald-400 tracking-tight">
-                        Compliant Architecture
-                      </h2>
+                      <div>
+                        <h2 className="text-3xl sm:text-4xl font-light text-emerald-400 tracking-tight">
+                          Compliant Architecture
+                        </h2>
+                        <p className="text-xs text-white/50 font-light mt-1">
+                          All applicable European statutory requirements verified and satisfied.
+                        </p>
+                      </div>
+                    </div>
+                  ) : result.risk_category === "Pending Clarification" ||
+                    result.executive_summary_markdown.toLowerCase().includes("pending clarification") ||
+                    result.executive_summary_markdown.toLowerCase().includes("pending information") ? (
+                    /* State 2: Pending Clarification (Inquiries Required) */
+                    <div className="flex items-center space-x-3">
+                      <span className="text-3xl sm:text-4xl">⏳</span>
+                      <div>
+                        <h2 className="text-3xl sm:text-4xl font-light text-amber-400 tracking-tight">
+                          Pending Clarification
+                        </h2>
+                        <p className="text-xs text-white/50 font-light mt-1">
+                          Compliance determination suspended pending required architectural and operational details.
+                        </p>
+                      </div>
                     </div>
                   ) : (
+                    /* State 3: Active Legal Violation / High-Risk */
                     <div className="flex items-center space-x-3">
                       <span className="text-3xl sm:text-4xl">🔴</span>
-                      <h2 className="text-3xl sm:text-4xl font-light text-rose-400 tracking-tight">
-                        Action Required / High-Risk
-                      </h2>
+                      <div>
+                        <h2 className="text-3xl sm:text-4xl font-light text-rose-400 tracking-tight">
+                          Action Required / High-Risk
+                        </h2>
+                        <p className="text-xs text-white/50 font-light mt-1">
+                          Classified under {result.risk_category} risk tier with active legal breaches or high-risk obligations.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
-                <p className="text-xs text-white/50 font-light">
-                  Classified under {result.risk_category} risk tier across selected legal contexts.
-                </p>
               </div>
 
               <div className="px-6 py-3 rounded-full bg-indigo-500/[0.08] border border-indigo-500/20 text-indigo-200 backdrop-blur-xl flex items-center space-x-2 shadow-[0_4px_20px_0_rgba(0,0,0,0.2)]">
@@ -817,39 +965,49 @@ export default function ComplianceDashboard() {
               </div>
             </section>
 
-            {/* 4. Verified Legal Citations */}
+            {/* 4. Collapsible Legal Citations Accordions */}
             <section className="bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[2.5rem] p-8 sm:p-12 space-y-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <span className="text-2xl">📚</span>
                   <h3 className="text-2xl sm:text-3xl font-light text-white/95 tracking-tight">
-                    Verified Legal Citations
+                    Verified Statutory Citations
                   </h3>
                 </div>
                 <span className="text-xs px-3 py-1 rounded-full bg-white/10 text-white/70 border border-white/10 font-mono">
-                  {result.citations?.length || 0} Verbatim Extracts
+                  {result.citations?.length || 0} Grounded References
                 </span>
               </div>
 
               {result.citations && result.citations.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {result.citations.map((cit, idx) => (
-                    <div
+                    <details
                       key={idx}
-                      className="bg-black/30 p-6 rounded-3xl border border-white/5 space-y-3 backdrop-blur-md transition-all duration-200 hover:border-white/15"
+                      className="group bg-black/30 rounded-2xl border border-white/10 overflow-hidden backdrop-blur-md transition-all duration-200 open:border-indigo-500/30 open:bg-black/40 shadow-sm"
                     >
-                      <div className="flex items-center justify-between text-indigo-300 font-medium text-sm">
-                        <span>
-                          [{idx + 1}] {cit.document}
+                      <summary className="px-6 py-4 cursor-pointer font-semibold text-indigo-300 hover:text-indigo-200 flex items-center justify-between transition-colors list-none select-none">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/25 text-indigo-300 font-mono">
+                            Citation #{idx + 1}
+                          </span>
+                          <span className="text-sm text-white/90">
+                            {cit.document}
+                          </span>
+                          <span className="text-xs text-white/50 font-mono font-normal">
+                            • {String(cit.page).startsWith("Article") ? cit.page : `Page / Article: ${cit.page || "N/A"}`}
+                          </span>
+                        </div>
+                        <span className="text-xs text-white/40 group-open:rotate-180 transition-transform duration-200 ml-2">
+                          ▼
                         </span>
-                        <span className="text-white/50 font-mono text-xs">
-                          Page {cit.page || "N/A"}
-                        </span>
+                      </summary>
+                      <div className="px-6 pb-5 pt-1 text-sm text-white/80">
+                        <blockquote className="mt-2 pl-4 border-l-4 border-indigo-500/40 text-sm text-white/80 whitespace-pre-wrap italic bg-white/[0.02] p-4 rounded-r-xl leading-relaxed font-light">
+                          &ldquo;{cit.quoted_text || "No quote extracted."}&rdquo;
+                        </blockquote>
                       </div>
-                      <p className="text-white/80 italic text-sm sm:text-base bg-white/[0.03] p-5 rounded-2xl border border-white/5 leading-relaxed font-light">
-                        &ldquo;{cit.quoted_text || "No quote extracted."}&rdquo;
-                      </p>
-                    </div>
+                    </details>
                   ))}
                 </div>
               ) : (
@@ -861,7 +1019,7 @@ export default function ComplianceDashboard() {
               )}
             </section>
 
-            {/* 5. Human-in-the-Loop Dispute & Override Section - Completely Hidden for DEVELOPER Role */}
+            {/* 5. Human-in-the-Loop Dispute & Override Section - Restricted for DEVELOPER Role */}
             {user?.role !== "DEVELOPER" && (
               <section className="bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[2.5rem] p-8 sm:p-12 space-y-6">
                 <div className="space-y-1.5">
@@ -1007,7 +1165,7 @@ export default function ComplianceDashboard() {
                     </button>
                   </div>
 
-                  {/* Visual Blockchain Flow with High Contrast & Hover Elevation */}
+                  {/* Visual Blockchain Flow */}
                   <div className="space-y-4">
                     {ledgerData.blocks.map((block, idx) => (
                       <div
@@ -1044,7 +1202,6 @@ export default function ComplianceDashboard() {
                             )}
                           </div>
                         </div>
-
 
                         {/* Cryptographic Linkage Info */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
