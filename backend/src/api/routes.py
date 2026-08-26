@@ -174,20 +174,27 @@ async def evaluate_architecture(
 
             # Classify risk & compliance based on 3-state agentic matrix or generated report
             lower_summary = full_summary_text.lower()
-            if "pending clarification" in lower_summary or "pending information" in lower_summary or "⏳ pending" in lower_summary:
+            if "pending clarification" in lower_summary or "pending information" in lower_summary or "⏳ pending" in lower_summary or "### ❓ required clarifications" in lower_summary:
                 risk_category = "Pending Clarification"
                 is_compliant = False
+            elif "compliant architecture" in lower_summary or "all applicable eu statutory requirements satisfied" in lower_summary or "compliant with controls" in lower_summary or "status: ✅" in lower_summary or "verified compliance controls" in lower_summary:
+                risk_category = "Minimal Risk"
+                is_compliant = True
             elif "prohibited" in lower_summary:
                 risk_category = "Prohibited"
                 is_compliant = False
-            elif "high-risk" in lower_summary or "high risk" in lower_summary:
+            elif "critical vulnerabilities" in lower_summary or "mandatory remediation steps" in lower_summary:
                 risk_category = "High-Risk"
                 is_compliant = False
+            elif "high-risk" in lower_summary or "high risk" in lower_summary:
+                if "minimal risk" in lower_summary:
+                    risk_category = "Minimal Risk"
+                    is_compliant = True
+                else:
+                    risk_category = "High-Risk"
+                    is_compliant = False
             elif "specific transparency" in lower_summary:
                 risk_category = "Specific Transparency"
-                is_compliant = True
-            elif "compliant architecture" in lower_summary or "all applicable eu statutory requirements satisfied" in lower_summary:
-                risk_category = "Minimal Risk"
                 is_compliant = True
             else:
                 risk_category = "Minimal Risk"
