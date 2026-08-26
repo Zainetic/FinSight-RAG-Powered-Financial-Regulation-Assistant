@@ -39,6 +39,14 @@ class EvaluateRequest(BaseModel):
         description="Target legal jurisdictions for multi-regional FAISS filtering",
         example=["EU (AI Act, GDPR, PSD2)", "US (CCPA/CPRA)"]
     )
+    history: Optional[List[Dict[str, str]]] = Field(
+        default=[],
+        description="List of previous conversation turns formatted as [{'role': 'user'|'assistant', 'content': '...'}]"
+    )
+    mode: Optional[str] = Field(
+        default="strict",
+        description="Evaluation mode: 'strict' (3-state agentic auditing) or 'lenient' (scope-limited demo mode)"
+    )
 
 
 class EvaluateResponse(BaseModel):
@@ -104,6 +112,10 @@ class WebhookPayload(BaseModel):
         description="Optional list of target legal jurisdictions to filter (e.g. ['EU', 'UK', 'US'])",
         example=["EU", "UK"]
     )
+    mode: Optional[str] = Field(
+        default="strict",
+        description="Evaluation mode for automated CI/CD pipeline ('strict' or 'lenient')"
+    )
 
 
 class WebhookScanResponse(BaseModel):
@@ -124,7 +136,7 @@ class WebhookScanResponse(BaseModel):
     "/api/v1/evaluate",
     summary="Evaluate Architectural Compliance (Streaming SSE, Authenticated)",
     description=(
-        "Executes high-speed LangChain RAG streaming against FAISS, "
+        "Executes high-speed LangChain RAG streaming against FAISS with full multi-turn conversational memory, "
         "streams generated Markdown tokens in real-time via Server-Sent Events (SSE), "
         "and anchors the final compliance judgment into the tenant's immutable SHA-256 PostgreSQL ledger."
     )
@@ -140,7 +152,9 @@ async def evaluate_architecture(
         try:
             async for event in astream_compliance_engine(
                 user_query=request.query.strip(),
-                jurisdictions=request.jurisdictions
+                jurisdictions=request.jurisdictions,
+                history=request.history,
+                mode=request.mode or "strict"
             ):
                 if event.get("type") == "start":
                     citations = event.get("citations", [])
@@ -158,9 +172,12 @@ async def evaluate_architecture(
 
             full_summary_text = "".join(accumulated_tokens).strip()
 
-            # Classify risk & compliance based on generated report
+            # Classify risk & compliance based on 3-state agentic matrix or generated report
             lower_summary = full_summary_text.lower()
-            if "prohibited" in lower_summary:
+            if "pending clarification" in lower_summary or "pending information" in lower_summary or "⏳ pending" in lower_summary:
+                risk_category = "Pending Clarification"
+                is_compliant = False
+            elif "prohibited" in lower_summary:
                 risk_category = "Prohibited"
                 is_compliant = False
             elif "high-risk" in lower_summary or "high risk" in lower_summary:
@@ -168,6 +185,9 @@ async def evaluate_architecture(
                 is_compliant = False
             elif "specific transparency" in lower_summary:
                 risk_category = "Specific Transparency"
+                is_compliant = True
+            elif "compliant architecture" in lower_summary or "all applicable eu statutory requirements satisfied" in lower_summary:
+                risk_category = "Minimal Risk"
                 is_compliant = True
             else:
                 risk_category = "Minimal Risk"
@@ -181,7 +201,8 @@ async def evaluate_architecture(
                 "jurisdictions": request.jurisdictions or ["EU (AI Act, GDPR, PSD2)"],
                 "org_id": current_user.org_id,
                 "evaluated_by": current_user.email,
-                "role": current_user.role.value
+                "role": current_user.role.value,
+                "mode": request.mode or "strict"
             }
 
             # Commit to immutable PostgreSQL SHA-256 ledger scoped to tenant's org_id
@@ -340,7 +361,9 @@ async def scan_repo_webhook(
     try:
         result = query_compliance_engine(
             user_query=payload.architecture_changes.strip(),
-            jurisdictions=payload.jurisdictions
+            jurisdictions=payload.jurisdictions,
+            history=[],
+            mode=payload.mode or "strict"
         )
 
         audit_payload = {
@@ -351,7 +374,8 @@ async def scan_repo_webhook(
                 "jurisdictions": payload.jurisdictions or ["EU (Default)"],
                 "source": "GITHUB_ACTIONS_WEBHOOK",
                 "org_id": current_user.org_id,
-                "triggered_by": current_user.email
+                "triggered_by": current_user.email,
+                "mode": payload.mode or "strict"
             }
         }
 
@@ -408,6 +432,3 @@ async def scan_repo_webhook(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Automated compliance evaluation failed: {str(e)}"
         )
-
-
-
