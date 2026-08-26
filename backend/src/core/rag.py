@@ -73,10 +73,18 @@ class ComplianceCitation(BaseModel):
 
 class ComplianceJudgment(BaseModel):
     risk_category: str = Field(
-        description="Must be strictly classified as: Prohibited, High-Risk, Specific Transparency, or Minimal Risk"
+        description=(
+            "The global risk classification across all financial and AI regulations. "
+            "Must be strictly classified as: 'Prohibited', 'High-Risk', 'Specific Transparency', or 'Minimal Risk'. "
+            "If ANY law (e.g., MiCA, PSD2, GDPR) is violated or triggers high-risk obligations, you MUST escalate this to 'High-Risk' or 'Prohibited' regardless of AI involvement."
+        )
     )
     is_compliant: bool = Field(
-        description="True if the action is allowed under the law, False if it is prohibited or high-risk."
+        description=(
+            "Strictly True if the architecture is fully compliant with ALL applicable laws. "
+            "MUST be False if there is a violation of ANY regulation (including MiCA, PSD2, GDPR, AMLD, DORA, etc.), "
+            "even if the EU AI Act risk is minimal."
+        )
     )
     citations: List[ComplianceCitation] = Field(
         description="A list of the documents and pages used to make this judgment."
