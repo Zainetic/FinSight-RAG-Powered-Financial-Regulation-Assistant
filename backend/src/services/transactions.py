@@ -1,36 +1,60 @@
 """
-FinSight RegTech - Real-Time FAISS Regulatory Transaction Gatekeeper Service
-=============================================================================
-Connects inbound financial transactions dynamically to the 615-article FAISS
-vector store (AMLD6, TFR, PSD2, MiCA, DORA, GDPR).
-
-Performs:
-1. Zero-Trust PII Scrubbing.
-2. Dynamic Search Query Formulation.
-3. Multi-Act Statutory FAISS Retrieval & Grounded Citations.
-4. Google Gemini Flash Native Structured Gatekeeper Audit.
-5. Deterministic SHA-256 Cryptographic Audit Digest Generation.
+FinSight RegTech - High-Speed Sub-Second Transaction Gatekeeper Service
+=======================================================================
+Optimized for low-latency M2M machine-to-machine financial transaction evaluations:
+1. High-speed gemini-flash-lite-latest / gemini-1.5-flash engine with low token budget (max_output_tokens=200).
+2. Throttled FAISS vector retrieval (k=2) for minimal prompt overhead.
+3. Strict brevity mandate on LLM generation (single sentence, <=20 words).
+4. Sub-second zero-trust PII masking and SHA-256 ledger anchoring.
 """
 
 import os
 import json
 import hashlib
+import threading
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
+from langchain_google_genai import ChatGoogleGenerativeAI
 from src.schemas.transaction import TransactionPayload, TransactionEvaluationResult
 from src.core.rag import get_vector_store, clean_regulatory_text
-from src.core.llm import get_gemini_llm
 
 
 SANCTIONED_COUNTRIES = {"KP", "IR", "SY"}
 HIGH_RISK_JURISDICTIONS = {"KY", "PA", "VG", "BS", "RU"}
 
+_fast_llm_instance: Optional[ChatGoogleGenerativeAI] = None
+_fast_llm_lock = threading.Lock()
+
+
+def get_fast_transaction_llm() -> ChatGoogleGenerativeAI:
+    """
+    High-speed, low-token LLM configuration optimized specifically for real-time
+    M2M transaction compliance evaluations.
+    Uses gemini-flash-lite-latest (or gemini-1.5-flash / gemini-3.5-flash-lite) with a 200 token budget.
+    """
+    global _fast_llm_instance
+    if _fast_llm_instance is None:
+        with _fast_llm_lock:
+            if _fast_llm_instance is None:
+                api_key = os.getenv("GOOGLE_API_KEY")
+                if not api_key:
+                    raise ValueError("Critical Error: GOOGLE_API_KEY is missing from environment.")
+
+                model_name = os.getenv("GEMINI_TRANSACTION_MODEL", "gemini-flash-lite-latest")
+                _fast_llm_instance = ChatGoogleGenerativeAI(
+                    model=model_name,
+                    temperature=0.0,
+                    max_output_tokens=200,
+                    max_retries=1,
+                    request_timeout=15.0
+                )
+    return _fast_llm_instance
+
 
 def mask_iban(iban: Optional[str]) -> str:
     """
-    Masks the middle portion of an IBAN while preserving country and check prefixes.
-    Example: 'DE89370400440532013000' -> 'DE89************3000'
+    Fast sub-millisecond IBAN masking preserving prefixes and suffixes.
     """
     if not iban:
         return "[N/A]"
@@ -45,9 +69,7 @@ def mask_iban(iban: Optional[str]) -> str:
 
 def scrub_transaction_pii(tx: TransactionPayload) -> Dict[str, Any]:
     """
-    Zero-Trust PII Sanitizer:
-    Redacts real personal names and account numbers while keeping routing
-    codes, amounts, currencies, and technical parameters intact for statutory evaluation.
+    Zero-Trust PII Sanitizer for ingress payloads.
     """
     return {
         "transaction_id": tx.transaction_id or tx.tx_id or "TX-UNSET",
@@ -69,11 +91,11 @@ def scrub_transaction_pii(tx: TransactionPayload) -> Dict[str, Any]:
 
 def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
     """
-    Evaluates an inbound financial transaction against the 615-article FAISS regulatory vector database:
+    Evaluates an inbound financial transaction against the FAISS vector database with sub-second optimization:
     1. Sanitizes PII.
-    2. Formulates dynamic search query based on amount, countries, asset, and SCA status.
-    3. Retrieves grounded statutory context & citations from FAISS (AMLD6, TFR, PSD2, MiCA).
-    4. Evaluates regulatory compliance via Gemini Flash Native Structured Output.
+    2. Formulates concise search query.
+    3. Throttles retrieval to top k=2 critical statutory hits.
+    4. Evaluates compliance via high-speed Flash-Lite Native Structured Output (max 200 tokens).
     5. Computes deterministic SHA-256 cryptographic audit digest.
     """
     now_utc = datetime.now(timezone.utc)
@@ -90,17 +112,17 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
     asset_type = scrubbed["asset_type"]
     kyc_level = scrubbed["sender_kyc_level"]
 
-    # 1. Immediate Sanctions Check (Instant Block)
+    # 1. Immediate Sanctions Fast-Path (0ms LLM bypass)
     if orig_country in SANCTIONED_COUNTRIES or benef_country in SANCTIONED_COUNTRIES:
         target_country = orig_country if orig_country in SANCTIONED_COUNTRIES else benef_country
-        rationale = f"Immediate transaction block: Country '{target_country}' is subject to comprehensive international financial sanctions and FATF blacklist embargo."
+        rationale = f"Blocked: {target_country} is under international sanctions and FATF embargo."
         violations = [f"International Sanctions Embargo ({target_country})"]
-        applicable_regs = ["EU Regulation 2024/1624 Art. 29", "AMLD6 Sanctions Enforcement", "FATF Blacklist"]
+        applicable_regs = ["EU Regulation 2024/1624 Art. 29", "FATF Blacklist"]
         sanction_citations = [
             {
                 "document": "EU Regulation 2024/1624",
-                "page": "Article 29 - Sanctions Enforcement",
-                "quoted_text": "Credit institutions and financial entities are prohibited from processing, clearing, or executing fund transfers originating from or destined for territories subject to international sanctions and asset freeze directives."
+                "page": "Article 29",
+                "quoted_text": "Financial entities are prohibited from processing fund transfers destined for sanctioned territories."
             }
         ]
 
@@ -127,36 +149,36 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
             applicable_regulations=applicable_regs,
             audit_rationale=rationale,
             citations=sanction_citations,
-            rule_triggered="FATF High-Risk Jurisdiction - International Sanctions & Total Embargo",
-            legal_basis="EU Regulation 2024/1624 Art. 29, OFAC Sanctions Regime & FATF Blacklist",
+            rule_triggered="FATF High-Risk Jurisdiction - Sanctions Embargo",
+            legal_basis="EU Regulation 2024/1624 Art. 29 & FATF Blacklist",
             sha256_audit_hash=sha256_audit_hash,
             timestamp=timestamp,
             raw_payload_preview=tx.model_dump(),
             scrubbed_payload_sent_to_engine=scrubbed
         )
 
-    # 2. Dynamic Query Formulation & FAISS Retrieval
+    # 2. Throttled Query Formulation & FAISS Retrieval (k=2)
     search_query = (
-        f"Financial transfer amount {amount} {currency} payment method {payment_method} "
-        f"between {orig_country} and {benef_country} "
-        f"SCA authenticated {sca_auth} asset type {asset_type} KYC level {kyc_level}"
+        f"{payment_method} {amount} {currency} {orig_country}->{benef_country} "
+        f"SCA:{sca_auth} {asset_type} KYC:{kyc_level}"
     )
 
     context_snippets: List[str] = []
     citations: List[Dict[str, str]] = []
-    top_legal_basis = "EU Financial Regulatory Directives (AMLD6, TFR, PSD2, MiCA)"
+    top_legal_basis = "EU Directives (AMLD6, TFR, PSD2, MiCA)"
 
     try:
         vector_store = get_vector_store()
         if vector_store:
-            relevant_docs = vector_store.similarity_search(search_query, k=4)
+            # Throttled to top 2 chunks for minimal token overhead and fast parsing
+            relevant_docs = vector_store.similarity_search(search_query, k=2)
             for idx, doc in enumerate(relevant_docs):
                 source = doc.metadata.get("source", "Regulation")
                 art_label = doc.metadata.get("article_label", f"Article {doc.metadata.get('article_number', 'General')}")
                 title = doc.metadata.get("title", "")
                 page_str = f"{art_label} - {title}".strip(" -")
                 cleaned_text = clean_regulatory_text(doc.page_content)
-                context_snippets.append(f"[{idx+1}] {source} ({art_label} - {title}): {cleaned_text[:350]}")
+                context_snippets.append(f"[{idx+1}] {source} ({art_label}): {cleaned_text[:180]}")
                 
                 citations.append({
                     "document": source,
@@ -168,45 +190,36 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
                 top_doc = relevant_docs[0]
                 src = top_doc.metadata.get("source", "Regulation")
                 lbl = top_doc.metadata.get("article_label", "")
-                ttl = top_doc.metadata.get("title", "")
-                top_legal_basis = f"{src} {lbl} ({ttl})".strip()
+                top_legal_basis = f"{src} {lbl}".strip()
     except Exception as e:
         print(f"[Transaction Gatekeeper Warning] FAISS retrieval notice: {e}")
 
-    joined_context = "\n\n".join(context_snippets) if context_snippets else "General European Regulatory Framework (AMLD6, TFR, PSD2, MiCA)."
+    joined_context = "\n".join(context_snippets) if context_snippets else "EU Framework (AMLD6, TFR, PSD2, MiCA)."
 
-    # 3. LLM Gatekeeper Evaluation with Native Structured Output
+    # 3. High-Speed LLM Gatekeeper Evaluation (gemini-flash-lite-latest, max 200 tokens)
     system_prompt = (
-        "You are FinSight AI, a real-time automated transaction gatekeeper and sanctions auditor. "
-        "Evaluate the inbound financial transfer against the provided statutory EU legal context.\n\n"
-        "STATUTORY COMPLIANCE DIRECTIVES:\n"
-        "1. TFR (Transfer of Funds Regulation (EU) 2023/1113) & AMLD: Crypto or wire transfers >= €1,000 require complete originator/beneficiary verification. If transfer is >= €1,000 and lacks Enhanced Due Diligence when crossing high-risk jurisdictions, FLAG or BLOCK.\n"
-        "2. PSD2 (Directive (EU) 2015/2366 Art. 97 & RTS): Remote electronic payments REQUIRE Strong Customer Authentication (SCA). If sca_authenticated is False and amount > €30 without a documented recurring exemption, BLOCK.\n"
-        "3. MiCA (Regulation (EU) 2023/1114): Token transfers involving unauthorized algorithmic EMTs or non-compliant crypto-assets must be BLOCKED.\n"
-        "4. High-Risk / Tax Havens ({KY, PA, VG, BS, RU}): Transfers >= €10,000 without 'enhanced' KYC must be FLAGGED or BLOCKED.\n"
-        "5. Standard Low-Risk SEPA / Domestic: If fully authenticated and compliant, assign verdict 'APPROVED', risk_score <= 0.25, is_compliant=True.\n\n"
+        "You are FinSight AI, a sub-second real-time transaction gatekeeper.\n"
+        "Evaluate the transfer against EU statutory rules:\n"
+        "- TFR & AMLD: Crypto/wire transfers >= €1,000 require complete originator/beneficiary verification.\n"
+        "- PSD2 Art. 97: Remote electronic payments REQUIRE SCA unless amount <= €30. If sca_authenticated is False and amount > 30, BLOCK.\n"
+        "- MiCA: Algorithmic EMTs or unauthorized tokens must be BLOCKED.\n"
+        "- High-Risk Tax Havens (KY, PA, VG, BS, RU): Transfers >= €10,000 without enhanced KYC must be FLAGGED.\n\n"
         "VERDICT ROUTING:\n"
-        "You must strictly assign the 'verdict' field based on compliance. If the transaction complies with all regulations (e.g., standard SEPA, no missing mandatory data, no sanctions), you MUST output 'APPROVED'. Only output 'FLAGGED' for suspicious anomalies, and 'BLOCKED' for explicit legal violations.\n\n"
-        "Provide authoritative, concise statutory citations in applicable_regulations and a crisp technical justification in audit_rationale."
+        "- 'APPROVED': Compliant transfer (risk_score <= 0.20, is_compliant=True).\n"
+        "- 'FLAGGED': Suspicious anomaly or EDD required (risk_score 0.60-0.85, is_compliant=False).\n"
+        "- 'BLOCKED': Explicit legal breach, missing mandatory SCA on high value, or sanctions (risk_score >= 0.90, is_compliant=False).\n\n"
+        "BREVITY MANDATE: Your 'audit_rationale' MUST be a single, concise sentence (maximum 20 words). Do not explain the history of the law. State the exact violation or state that it is compliant, and stop generating."
     )
 
     human_content = (
-        f"INBOUND TRANSACTION SPECIFICATION:\n"
-        f"- Transaction ID: {tx_id}\n"
-        f"- Amount: {amount} {currency}\n"
-        f"- Asset Type: {asset_type}\n"
-        f"- Payment Rail / Method: {payment_method}\n"
-        f"- Originator Country: {orig_country}\n"
-        f"- Beneficiary Country: {benef_country}\n"
-        f"- Strong Customer Authentication (SCA): {sca_auth}\n"
-        f"- Sender KYC Level: {kyc_level}\n\n"
-        f"RETRIEVED STATUTORY LEGAL CONTEXT SNIPPETS:\n"
-        f"{joined_context}\n\n"
-        f"Perform transaction gatekeeper evaluation:"
+        f"TRANSACTION: {amount} {currency} via {payment_method} from {orig_country} to {benef_country}. "
+        f"SCA: {sca_auth}, Asset: {asset_type}, KYC: {kyc_level}.\n"
+        f"LEGAL CONTEXT:\n{joined_context}\n"
+        f"Evaluate:"
     )
 
     try:
-        llm = get_gemini_llm()
+        llm = get_fast_transaction_llm()
         structured_llm = llm.with_structured_output(TransactionEvaluationResult)
         
         parsed_result = structured_llm.invoke([
@@ -219,8 +232,8 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
         else:
             result = TransactionEvaluationResult(**dict(parsed_result))
     except Exception as e:
-        print(f"[Transaction Gatekeeper LLM Fallback] Error in LLM invocation: {e}")
-        # Deterministic fallback evaluation if LLM call is interrupted
+        print(f"[Transaction Gatekeeper LLM Fallback] Error in fast LLM invocation: {e}")
+        # Deterministic sub-millisecond fallback evaluation
         is_high_risk_country = orig_country in HIGH_RISK_JURISDICTIONS or benef_country in HIGH_RISK_JURISDICTIONS
         is_missing_sca = (not sca_auth) and amount > 30
 
@@ -231,28 +244,28 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
                 risk_score=0.92,
                 is_compliant=False,
                 primary_violations=["Missing Mandatory Strong Customer Authentication (PSD2 Art. 97)"],
-                applicable_regulations=["PSD2 Directive (EU) 2015/2366 Article 97", "EBA RTS on SCA"],
-                audit_rationale=f"Remote electronic transfer of {amount} {currency} blocked due to unauthenticated payment initiation exceeding the €30 low-value exemption threshold."
+                applicable_regulations=["PSD2 Directive (EU) 2015/2366 Article 97"],
+                audit_rationale=f"Transfer of {amount} {currency} blocked due to unauthenticated initiation exceeding €30 exemption threshold."
             )
         elif is_high_risk_country and amount >= 10000 and kyc_level != "enhanced":
             result = TransactionEvaluationResult(
                 transaction_id=tx_id,
                 verdict="FLAGGED",
-                risk_score=0.88,
+                risk_score=0.85,
                 is_compliant=False,
-                primary_violations=["Missing Enhanced Due Diligence (EDD) for High-Risk Non-Cooperative Jurisdiction"],
-                applicable_regulations=["AMLD6 Directive (EU) 2018/1673", "FATF Recommendation 19"],
-                audit_rationale=f"Cross-border transfer of {amount} {currency} to high-risk jurisdiction flagged: Enhanced Due Diligence (EDD) documentation mandatory."
+                primary_violations=["Missing Enhanced Due Diligence (EDD) for High-Risk Jurisdiction"],
+                applicable_regulations=["AMLD6 Directive (EU) 2018/1673"],
+                audit_rationale=f"Cross-border transfer of {amount} {currency} to high-risk jurisdiction flagged for mandatory EDD documentation."
             )
         else:
             result = TransactionEvaluationResult(
                 transaction_id=tx_id,
                 verdict="APPROVED",
-                risk_score=0.15 if amount < 10000 else 0.35,
+                risk_score=0.10 if amount < 10000 else 0.25,
                 is_compliant=True,
                 primary_violations=[],
                 applicable_regulations=["AMLD5 Directive (EU) 2018/843", "PSD2 Directive (EU) 2015/2366"],
-                audit_rationale=f"Transaction verified: Standard {payment_method} transfer compliant with regional KYC and PSD2 SCA safeguards."
+                audit_rationale=f"Transfer of {amount} {currency} is fully compliant with regional KYC and PSD2 SCA safeguards."
             )
 
     # 4. Strict Routing Alignment
