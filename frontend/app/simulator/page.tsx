@@ -8,6 +8,12 @@ import { useAuth } from "../context/AuthContext";
 // Data Contracts
 // =====================================================================
 
+interface Citation {
+  document: string;
+  page: string | number;
+  quoted_text: string;
+}
+
 interface TransactionFormState {
   tx_id: string;
   sender_name: string;
@@ -37,14 +43,20 @@ interface ScrubbedPayload {
 }
 
 interface GatekeeperResponse {
-  verdict: "PASS" | "FAIL";
+  transaction_id?: string;
+  verdict: "PASS" | "FAIL" | "APPROVED" | "FLAGGED" | "BLOCKED" | string;
   risk_score: number;
+  is_compliant?: boolean;
+  primary_violations?: string[];
+  applicable_regulations?: string[];
+  audit_rationale?: string;
   rule_triggered: string | null;
   legal_basis: string | null;
   sha256_audit_hash: string;
   timestamp: string;
   raw_payload_preview: Record<string, unknown>;
   scrubbed_payload_sent_to_engine: ScrubbedPayload;
+  citations?: Citation[];
 }
 
 interface LedgerRecord {
@@ -269,33 +281,32 @@ export default function SimulatorPage() {
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-slate-900 via-[#120e24] to-slate-950 text-white/90 font-sans selection:bg-indigo-500/30 selection:text-white relative overflow-x-hidden flex flex-col">
       {/* Ambient Glassmorphism Gradient Glow Orbs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute -top-48 -right-48 w-[700px] h-[700px] bg-purple-600/15 rounded-full blur-[150px] animate-pulse" />
-        <div className="absolute top-1/2 -left-48 w-[600px] h-[600px] bg-indigo-600/15 rounded-full blur-[140px]" />
-        <div className="absolute -bottom-48 right-1/4 w-[650px] h-[650px] bg-sky-600/10 rounded-full blur-[160px]" />
+        <div className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-indigo-600/15 rounded-full blur-[140px] animate-pulse" />
+        <div className="absolute top-1/2 -left-40 w-[550px] h-[550px] bg-purple-600/15 rounded-full blur-[130px]" />
+        <div className="absolute -bottom-40 right-1/3 w-[600px] h-[600px] bg-sky-600/10 rounded-full blur-[150px]" />
       </div>
 
       {/* Navigation Header */}
-      <header className="border-b border-white/10 bg-white/[0.02] backdrop-blur-2xl sticky top-0 z-40 transition-all duration-200">
+      <header className="border-b border-white/10 bg-white/[0.02] backdrop-blur-2xl sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 h-20 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Link
               href="/"
-              className="h-10 w-10 rounded-2xl bg-white/[0.08] border border-white/15 flex items-center justify-center text-lg hover:bg-white/15 transition-all duration-200 ease-out active:scale-95 shadow-inner"
-              title="Return to Dashboard"
+              className="h-11 w-11 rounded-2xl bg-white/[0.08] border border-white/15 p-0.5 flex items-center justify-center shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] backdrop-blur-xl hover:bg-white/[0.12] transition-all"
             >
-              <span>&larr;</span>
+              <span className="text-xl">⚖️</span>
             </Link>
             <div>
               <div className="flex items-center space-x-2.5">
                 <span className="font-semibold text-lg tracking-tight text-white/95">
-                  FinSight Gatekeeper
+                  FinSight
                 </span>
                 <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/25 font-mono">
-                  Sandbox Simulator
+                  Gatekeeper Simulator
                 </span>
               </div>
               <p className="text-xs text-white/50 font-light hidden sm:block">
-                Machine-to-Machine Financial Compliance & Zero-Trust PII Scrubbing
+                Real-Time AML, Sanctions & Zero-Trust Transaction Screening
               </p>
             </div>
           </div>
@@ -303,94 +314,78 @@ export default function SimulatorPage() {
           <div className="flex items-center space-x-3">
             <Link
               href="/"
-              className="text-xs px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-white/80 hover:text-white border border-white/15 backdrop-blur-xl transition-all duration-200 ease-out active:scale-95"
+              className="text-xs px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-white border border-white/15 backdrop-blur-xl transition-all duration-200 ease-out flex items-center space-x-2 shadow-[0_4px_20px_0_rgba(0,0,0,0.2)] active:scale-95"
             >
-              Compliance Dashboard
+              <span>&larr;</span>
+              <span className="font-medium">Back to Main Dashboard</span>
             </Link>
-            {user?.role === "MASTER_ADMIN" && (
-              <Link
-                href="/admin"
-                className="text-xs px-3.5 py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border border-purple-500/20 backdrop-blur-xl transition-all duration-200 ease-out active:scale-95"
-              >
-                Team Mgmt
-              </Link>
-            )}
           </div>
         </div>
       </header>
 
-      {/* Main Flowing Grid Canvas */}
+      {/* Main Container */}
       <main className="max-w-7xl mx-auto px-6 sm:px-8 py-10 flex-1 w-full space-y-10 relative z-10">
-        {/* Hero & Preset Buttons */}
-        <section className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl sm:text-4xl font-light tracking-tight text-white/95">
-                Transaction Gatekeeper Simulator
-              </h1>
-              <p className="text-xs sm:text-sm text-white/60 font-light mt-1">
-                Simulate real-time M2M payload processing, automated sanctions screening, and zero-trust PII sanitization.
-              </p>
-            </div>
-
-            {/* Presets */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs uppercase tracking-wider text-white/40 font-mono font-medium mr-1">
-                Presets:
-              </span>
-              <button
-                type="button"
-                onClick={() => applyPreset("routine")}
-                className="text-xs px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/25 transition-all duration-200 ease-out active:scale-95 flex items-center space-x-1.5"
-              >
-                <span>🟢</span>
-                <span>Routine (€2,450 FR&rarr;FR)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => applyPreset("offshore")}
-                className="text-xs px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/25 transition-all duration-200 ease-out active:scale-95 flex items-center space-x-1.5"
-              >
-                <span>🟡</span>
-                <span>Offshore (€45k &rarr; KY)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => applyPreset("sanctioned")}
-                className="text-xs px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/25 transition-all duration-200 ease-out active:scale-95 flex items-center space-x-1.5"
-              >
-                <span>🔴</span>
-                <span>Sanctioned (€12k &rarr; SY)</span>
-              </button>
-            </div>
+        {/* Hero Section */}
+        <section className="text-center space-y-3 max-w-3xl mx-auto">
+          <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-white/70 backdrop-blur-xl">
+            <span>⚡</span>
+            <span>Sub-Millisecond Machine-to-Machine Financial Compliance Pipeline</span>
           </div>
+          <h1 className="text-3xl sm:text-4xl font-light tracking-tight text-white/95 leading-tight">
+            Automated Transaction Gatekeeper & Zero-Trust PII Sandbox
+          </h1>
+          <p className="text-sm text-white/60 font-light max-w-2xl mx-auto leading-relaxed">
+            Dispatch mock financial transfers to simulate real-time sanctions screening, AML policy verification, 615-article FAISS regulatory vector retrieval, and SHA-256 ledger commits.
+          </p>
         </section>
 
-        {errorMessage && (
-          <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center space-x-3 animate-in fade-in duration-200">
-            <span>⚠️</span>
-            <span>{errorMessage}</span>
-          </div>
-        )}
+        {/* Quick Scenario Preset Triggers */}
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button
+            onClick={() => applyPreset("routine")}
+            className="text-xs px-4 py-2.5 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 text-emerald-200 transition-all duration-200 ease-out backdrop-blur-md active:scale-95 flex items-center space-x-2"
+          >
+            <span>🟢</span>
+            <span>Preset 1: Low-Risk SEPA Instant (€2,450 FR &rarr; FR)</span>
+          </button>
 
-        {/* 2-Panel Split Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <button
+            onClick={() => applyPreset("offshore")}
+            className="text-xs px-4 py-2.5 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 text-amber-200 transition-all duration-200 ease-out backdrop-blur-md active:scale-95 flex items-center space-x-2"
+          >
+            <span>🟡</span>
+            <span>Preset 2: Offshore Wire Without EDD (€45k DE &rarr; KY)</span>
+          </button>
+
+          <button
+            onClick={() => applyPreset("sanctioned")}
+            className="text-xs px-4 py-2.5 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-200 transition-all duration-200 ease-out backdrop-blur-md active:scale-95 flex items-center space-x-2"
+          >
+            <span>🔴</span>
+            <span>Preset 3: Sanctions Embargo Trigger (€12k GB &rarr; SY)</span>
+          </button>
+        </div>
+
+        {/* Simulator Core: 2-Column Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* =====================================================================
-              Left Panel: Editable Inbound Transaction Form (5 Cols)
+              Left Panel: Transaction Dispatch Form (5 Cols)
           ===================================================================== */}
-          <div className="lg:col-span-5">
+          <div className="lg:col-span-5 space-y-6">
             <div className="bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[2.5rem] p-6 sm:p-8 space-y-6">
-              <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                <div className="flex items-center space-x-3">
-                  <span className="text-xl">📤</span>
-                  <h2 className="text-lg sm:text-xl font-light text-white/95 tracking-tight">
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <span className="text-lg">💳</span>
+                  <h2 className="text-lg font-medium text-white/95">
                     Inbound Transaction Payload
                   </h2>
                 </div>
-                <span className="text-[11px] font-mono text-white/40">POST /evaluate</span>
+                <p className="text-xs text-white/50 font-light">
+                  Simulate an ingress transaction payload from core banking or payment gateway.
+                </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4 text-xs">
                 {/* Tx ID & Amount */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -402,7 +397,7 @@ export default function SimulatorPage() {
                       required
                       value={form.tx_id}
                       onChange={(e) => setForm({ ...form, tx_id: e.target.value })}
-                      className="w-full bg-black/30 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white/90 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md"
+                      className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white/90 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md"
                     />
                   </div>
                   <div className="space-y-1">
@@ -412,32 +407,35 @@ export default function SimulatorPage() {
                     <input
                       type="number"
                       required
+                      min={1}
                       step="any"
-                      min="0.01"
                       value={form.amount}
                       onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                      className="w-full bg-black/30 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white/90 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md font-semibold text-emerald-400"
+                      className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white/90 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md"
                     />
                   </div>
                 </div>
 
-                {/* Currency, Asset Type, KYC Tier */}
-                <div className="grid grid-cols-3 gap-2.5">
+                {/* Currency, Rail & KYC Tier */}
+                <div className="grid grid-cols-3 gap-2">
                   <div className="space-y-1">
                     <label className="text-[11px] uppercase font-mono tracking-wider text-white/50 block">
                       Currency
                     </label>
-                    <input
-                      type="text"
-                      required
+                    <select
                       value={form.currency}
-                      onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
-                      className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2.5 text-xs font-mono text-white/90 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md"
-                    />
+                      onChange={(e) => setForm({ ...form, currency: e.target.value })}
+                      className="w-full bg-black/30 border border-white/10 rounded-xl px-2.5 py-2.5 text-xs font-mono text-white/90 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 backdrop-blur-md"
+                    >
+                      <option value="EUR" className="bg-slate-900">EUR</option>
+                      <option value="USD" className="bg-slate-900">USD</option>
+                      <option value="GBP" className="bg-slate-900">GBP</option>
+                      <option value="USDC" className="bg-slate-900">USDC</option>
+                    </select>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[11px] uppercase font-mono tracking-wider text-white/50 block">
-                      Asset Type
+                      Payment Rail
                     </label>
                     <select
                       value={form.asset_type}
@@ -446,7 +444,7 @@ export default function SimulatorPage() {
                     >
                       <option value="SEPA_INSTANT" className="bg-slate-900">SEPA_INSTANT</option>
                       <option value="FIAT_WIRE" className="bg-slate-900">FIAT_WIRE</option>
-                      <option value="SWIFT_GPI" className="bg-slate-900">SWIFT_GPI</option>
+                      <option value="OPEN_BANKING_PIS" className="bg-slate-900">OPEN_BANKING_PIS</option>
                       <option value="CRYPTO_TRANSFER" className="bg-slate-900">CRYPTO_TRANSFER</option>
                     </select>
                   </div>
@@ -594,8 +592,10 @@ export default function SimulatorPage() {
                 {/* 1. Verdict Metric Hero Card */}
                 <div
                   className={`bg-white/5 backdrop-blur-2xl border shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[2.5rem] p-6 sm:p-8 relative overflow-hidden transition-all duration-200 ${
-                    result.verdict === "PASS"
+                    result.verdict === "APPROVED" || result.verdict === "PASS" || result.is_compliant === true
                       ? "border-emerald-500/30 bg-gradient-to-br from-emerald-950/20 via-transparent to-transparent"
+                      : result.verdict === "FLAGGED"
+                      ? "border-amber-500/30 bg-gradient-to-br from-amber-950/20 via-transparent to-transparent"
                       : "border-rose-500/30 bg-gradient-to-br from-rose-950/20 via-transparent to-transparent"
                   }`}
                 >
@@ -605,11 +605,18 @@ export default function SimulatorPage() {
                         Gatekeeper Regulatory Decision
                       </div>
                       <div className="flex items-center space-x-3 mt-1">
-                        {result.verdict === "PASS" ? (
+                        {result.verdict === "APPROVED" || result.verdict === "PASS" || result.is_compliant === true ? (
                           <>
                             <span className="text-3xl">🟢</span>
                             <span className="text-3xl font-bold tracking-tight text-emerald-400">
                               PASS (Approved)
+                            </span>
+                          </>
+                        ) : result.verdict === "FLAGGED" ? (
+                          <>
+                            <span className="text-3xl">⏳</span>
+                            <span className="text-3xl font-bold tracking-tight text-amber-400">
+                              FLAGGED (Action Required)
                             </span>
                           </>
                         ) : (
@@ -631,14 +638,14 @@ export default function SimulatorPage() {
                         </span>
                         <span
                           className={`text-xl font-mono font-bold ${
-                            result.risk_score > 75
+                            result.risk_score > 75 || result.risk_score > 0.75
                               ? "text-rose-400"
-                              : result.risk_score > 30
+                              : result.risk_score > 30 || result.risk_score > 0.30
                               ? "text-amber-400"
                               : "text-emerald-400"
                           }`}
                         >
-                          {result.risk_score} / 100
+                          {result.risk_score <= 1.0 ? Math.round(result.risk_score * 100) : Math.round(result.risk_score)} / 100
                         </span>
                       </div>
                     </div>
@@ -646,6 +653,18 @@ export default function SimulatorPage() {
 
                   {/* Rule & Legal Basis Info */}
                   <div className="mt-5 space-y-3 text-xs">
+                    {/* Technical Rationale */}
+                    {result.audit_rationale && (
+                      <div className="bg-black/30 p-4 rounded-2xl border border-white/5 space-y-1">
+                        <span className="text-[10px] uppercase font-mono text-white/40 block">
+                          Auditor Technical Justification
+                        </span>
+                        <p className="text-white/90 leading-relaxed font-light">
+                          {result.audit_rationale}
+                        </p>
+                      </div>
+                    )}
+
                     <div className="bg-black/30 p-4 rounded-2xl border border-white/5 space-y-1">
                       <span className="text-[10px] uppercase font-mono text-white/40 block">
                         Triggered Regulatory Rule
@@ -664,8 +683,51 @@ export default function SimulatorPage() {
                       </p>
                     </div>
 
+                    {/* Grounded Regulatory Citations (Collapsible Details & Summary) */}
+                    {result.citations && result.citations.length > 0 && (
+                      <div className="space-y-3 pt-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase font-mono tracking-wider text-white/40 block">
+                            Grounded Regulatory Citations ({result.citations.length})
+                          </span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-mono">
+                            FAISS Grounded
+                          </span>
+                        </div>
+
+                        <div className="space-y-2.5">
+                          {result.citations.map((cit, idx) => (
+                            <details
+                              key={idx}
+                              className="group bg-black/40 rounded-2xl border border-white/10 overflow-hidden backdrop-blur-md transition-all duration-200 open:border-indigo-500/30 open:bg-black/50 shadow-sm text-xs"
+                            >
+                              <summary className="px-5 py-3.5 cursor-pointer font-semibold text-indigo-300 hover:text-indigo-200 flex items-center justify-between transition-colors list-none select-none">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/25 text-indigo-300 font-mono">
+                                    Citation #{idx + 1}
+                                  </span>
+                                  <span className="text-white/95 font-medium">{cit.document}</span>
+                                  <span className="text-white/50 font-mono font-normal">
+                                    • {cit.page}
+                                  </span>
+                                </div>
+                                <span className="text-[11px] text-white/40 group-open:rotate-180 transition-transform duration-200 ml-2">
+                                  ▼
+                                </span>
+                              </summary>
+                              <div className="px-5 pb-4 pt-1">
+                                <blockquote className="mt-1 pl-4 border-l-4 border-indigo-500/40 text-xs text-white/80 whitespace-pre-wrap italic bg-white/[0.02] p-3.5 rounded-r-xl leading-relaxed font-light">
+                                  &ldquo;{cit.quoted_text || "No quote text available."}&rdquo;
+                                </blockquote>
+                              </div>
+                            </details>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* SHA-256 Audit Digest */}
-                    <div className="bg-black/40 p-4 rounded-2xl border border-white/10 flex items-center justify-between font-mono">
+                    <div className="bg-black/40 p-4 rounded-2xl border border-white/10 flex items-center justify-between font-mono mt-3">
                       <div className="truncate mr-3">
                         <span className="text-[9px] uppercase tracking-wider text-indigo-300 block font-sans">
                           SHA-256 Cryptographic Audit Hash
@@ -754,110 +816,92 @@ export default function SimulatorPage() {
           </div>
         </div>
 
-        {/* =====================================================================
-            Full-Width Live Transaction Audit Trail Ledger Table
-        ===================================================================== */}
+        {/* Live Immutable PostgreSQL Transaction Ledger Audit Trail */}
         <section className="bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[2.5rem] p-6 sm:p-8 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
             <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-lg shadow-inner">
+              <div className="h-10 w-10 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-lg shadow-inner">
                 ⛓️
               </div>
               <div>
-                <div className="flex items-center space-x-2.5">
-                  <h2 className="text-lg sm:text-xl font-light text-white/95 tracking-tight">
-                    Immutable Audit Trail &amp; Ledger
-                  </h2>
-                  <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/25">
-                    PostgreSQL Live Sync
-                  </span>
-                </div>
+                <h3 className="text-lg font-medium text-white/95">
+                  PostgreSQL Transaction Ledger Audit Trail
+                </h3>
                 <p className="text-xs text-white/50 font-light">
-                  Real-time transaction compliance logs with SHA-256 cryptographic verification digests.
+                  Immutable transaction verification entries with SHA-256 cryptographic hashes
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center space-x-3">
-              {isAdmin && (
-                <button
-                  type="button"
-                  onClick={handlePurgeSandbox}
-                  disabled={isPurging}
-                  className="text-xs px-3.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 backdrop-blur-xl transition-all duration-200 ease-out active:scale-95 flex items-center space-x-1.5 font-mono shadow-[0_2px_12px_0_rgba(244,63,94,0.15)] disabled:opacity-50"
-                  title="Purge Sandbox Transaction Ledger (Admin Only)"
-                >
-                  <span>⚠️</span>
-                  <span>{isPurging ? "Purging..." : "⚠️ Purge Sandbox Data"}</span>
-                </button>
-              )}
-
+            <div className="flex items-center space-x-2.5">
               <button
-                type="button"
                 onClick={fetchLedger}
                 disabled={isLoadingLedger}
-                className="text-xs px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-white/80 hover:text-white border border-white/15 backdrop-blur-xl transition-all duration-200 ease-out active:scale-95 flex items-center space-x-1.5 font-mono"
+                className="text-xs px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-white border border-white/15 backdrop-blur-xl transition-all duration-200 ease-out flex items-center space-x-1.5 active:scale-95 disabled:opacity-50 font-mono"
               >
-                <span className={isLoadingLedger ? "inline-block animate-spin" : ""}>🔄</span>
-                <span>{isLoadingLedger ? "Syncing..." : "Refresh Ledger"}</span>
+                <span>🔄</span>
+                <span>{isLoadingLedger ? "Refreshing..." : "Refresh Ledger"}</span>
               </button>
+
+              {isAdmin && (
+                <button
+                  onClick={handlePurgeSandbox}
+                  disabled={isPurging}
+                  className="text-xs px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/25 backdrop-blur-xl transition-all duration-200 ease-out flex items-center space-x-1.5 active:scale-95 disabled:opacity-50 font-mono"
+                  title="Purge Sandbox Test Ledger (Admin Only)"
+                >
+                  <span>🗑️</span>
+                  <span>{isPurging ? "Purging..." : "Purge Sandbox"}</span>
+                </button>
+              )}
             </div>
           </div>
 
-
-          {/* Table Container */}
-          <div className="overflow-x-auto rounded-2xl border border-white/5 bg-black/30">
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-white/[0.03] border-b border-white/10 text-white/50 uppercase tracking-wider text-[10px]">
-                <tr>
-                  <th className="py-3.5 px-4 font-medium">Timestamp (UTC)</th>
-                  <th className="py-3.5 px-4 font-medium">Transaction ID</th>
-                  <th className="py-3.5 px-4 font-medium">Verdict</th>
-                  <th className="py-3.5 px-4 font-medium">Risk Score</th>
-                  <th className="py-3.5 px-4 font-medium">SHA-256 Cryptographic Digest</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5 text-white/80">
-                {ledgerHistory.length > 0 ? (
-                  ledgerHistory.map((item, idx) => {
-                    const isPass = item.verdict === "PASS";
-                    const formattedTime = item.timestamp
-                      ? new Date(item.timestamp).toLocaleString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          second: "2-digit",
-                          hour12: false,
-                        })
-                      : "Just now";
-
+          {/* Ledger Table */}
+          <div className="overflow-x-auto">
+            {ledgerHistory.length > 0 ? (
+              <table className="w-full text-left text-xs font-mono">
+                <thead>
+                  <tr className="border-b border-white/10 text-white/40 uppercase text-[10px] tracking-wider font-sans">
+                    <th className="pb-3 px-3">Status</th>
+                    <th className="pb-3 px-3">Transaction ID</th>
+                    <th className="pb-3 px-3">Amount</th>
+                    <th className="pb-3 px-3">Risk Score</th>
+                    <th className="pb-3 px-3">Triggered Rule</th>
+                    <th className="pb-3 px-3">Audit Hash</th>
+                    <th className="pb-3 px-3 text-right">Timestamp</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {ledgerHistory.map((item, idx) => {
+                    const isPass = item.verdict === "PASS" || item.verdict === "APPROVED";
+                    const payload = (item.payload_data || {}) as Record<string, unknown>;
+                    const amt = payload.amount ? `${payload.amount} ${payload.currency || "EUR"}` : "N/A";
                     return (
-                      <tr
-                        key={item.id || item.transaction_id || idx}
-                        className="hover:bg-white/[0.02] transition-colors"
-                      >
-                        <td className="py-3.5 px-4 text-white/50 text-[11px] whitespace-nowrap">
-                          {formattedTime}
-                        </td>
-                        <td className="py-3.5 px-4 font-semibold text-white/90">
-                          {item.transaction_id}
-                        </td>
-                        <td className="py-3.5 px-4">
+                      <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="py-3 px-3">
                           <span
-                            className={`inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            className={`inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-full text-[10px] font-sans font-medium ${
                               isPass
-                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25"
-                                : "bg-rose-500/10 text-rose-400 border border-rose-500/25"
+                                ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                                : "bg-rose-500/15 text-rose-300 border border-rose-500/30"
                             }`}
                           >
-                            <span>{isPass ? "🟢" : "🔴"}</span>
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${
+                                isPass ? "bg-emerald-400" : "bg-rose-400"
+                              }`}
+                            />
                             <span>{item.verdict}</span>
                           </span>
                         </td>
-                        <td className="py-3.5 px-4">
+                        <td className="py-3 px-3 text-white/90 font-medium">
+                          {item.transaction_id}
+                        </td>
+                        <td className="py-3 px-3 text-white/70">{amt}</td>
+                        <td className="py-3 px-3">
                           <span
-                            className={`font-bold ${
+                            className={`font-semibold ${
                               item.risk_score > 75
                                 ? "text-rose-400"
                                 : item.risk_score > 30
@@ -868,39 +912,26 @@ export default function SimulatorPage() {
                             {item.risk_score} / 100
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-white/60">
-                          <div className="flex items-center space-x-2">
-                            <span className="truncate max-w-[200px] sm:max-w-[280px]">
-                              {item.sha256_hash}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                copyToClipboard(item.sha256_hash, `ledger_${idx}`)
-                              }
-                              className="text-[10px] px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-white transition-all duration-150 active:scale-95 shrink-0"
-                            >
-                              {copiedKey === `ledger_${idx}` ? "Copied" : "Copy"}
-                            </button>
-                          </div>
+                        <td className="py-3 px-3 text-white/60 truncate max-w-xs font-sans">
+                          {item.rule_triggered || "Standard Compliance"}
+                        </td>
+                        <td className="py-3 px-3 text-indigo-300/80 truncate max-w-[140px]">
+                          {item.sha256_hash ? `${item.sha256_hash.slice(0, 10)}...` : "N/A"}
+                        </td>
+                        <td className="py-3 px-3 text-right text-white/40">
+                          {item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : "Recent"}
                         </td>
                       </tr>
                     );
-                  })
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="py-8 text-center text-white/40 text-xs font-light font-sans"
-                    >
-                      {isLoadingLedger
-                        ? "Loading audit ledger entries..."
-                        : "No evaluated transactions found. Dispatch a transaction above to create the first ledger entry."}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <div className="py-12 text-center text-white/40 space-y-2">
+                <span className="text-2xl block">📂</span>
+                <p className="text-xs">No transactions recorded in the PostgreSQL ledger yet.</p>
+              </div>
+            )}
           </div>
         </section>
       </main>

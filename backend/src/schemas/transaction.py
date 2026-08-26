@@ -120,7 +120,7 @@ class TransactionEvaluationResult(BaseModel):
         description="Unique identifier of the evaluated transaction"
     )
     verdict: Literal["APPROVED", "FLAGGED", "BLOCKED", "PASS", "FAIL"] = Field(
-        description="Final regulatory decision: 'APPROVED' (PASS), 'FLAGGED' (Action/EDD Required), or 'BLOCKED' (FAIL)"
+        description="Final regulatory decision. Must be strictly 'APPROVED' (PASS) if the transaction complies with statutory requirements. Use 'FLAGGED' for suspicious anomalies, and 'BLOCKED' (FAIL) for explicit legal violations."
     )
     risk_score: float = Field(
         description="Calculated composite risk score on a scale from 0.0 (minimal risk) to 1.0 (extreme risk / illegal breach)"
@@ -138,6 +138,10 @@ class TransactionEvaluationResult(BaseModel):
     )
     audit_rationale: str = Field(
         description="Concise, authoritative technical justification explaining why the transfer passed, was flagged, or was blocked"
+    )
+    citations: Optional[List[Dict[str, str]]] = Field(
+        default_factory=list,
+        description="List of regulatory citations retrieved from FAISS formatted as [{'document': '...', 'page': '...', 'quoted_text': '...'}]"
     )
 
     # Cryptographic Ledger and UI Integration Metadata
