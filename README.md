@@ -17,16 +17,6 @@ It evaluates software architectures, tokenization mechanisms, payment rails, and
 
 ---
 
-## 📸 Screenshots
-
-* [ ] **TODO**: Add screenshot of 3-State Agentic Compliance Audit Dashboard (`/`)
-* [ ] **TODO**: Add screenshot of Real-Time Transaction Gatekeeper Simulator (`/simulator`)
-* [ ] **TODO**: Add screenshot of Multi-Tenant Genesis Block & SHA-256 Ledger Explorer Modal
-* [ ] **TODO**: Add screenshot of Split-Screen Authentication & Organization Onboarding (`/login`, `/register`)
-* [ ] **TODO**: Add screenshot of Admin Team Management & RBAC Provisioning (`/admin`)
-
----
-
 ## 🏛️ Key Capabilities & Features
 
 ### 1. 🤖 3-State Agentic Auditing & Multi-Turn Memory
