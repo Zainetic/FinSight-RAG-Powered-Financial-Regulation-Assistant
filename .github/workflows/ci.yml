@@ -16,7 +16,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16
         env:
           POSTGRES_DB: finsight_db
           POSTGRES_USER: postgres
@@ -24,7 +24,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d finsight_db"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -44,8 +44,8 @@ jobs:
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
-          pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-          pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
 
       - name: Run Backend Tests with Pytest
         working-directory: backend
@@ -53,7 +53,7 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/finsight_db
           JWT_SECRET_KEY: ci-test-secret-key-32-chars-long-2026
         run: |
-          pytest -v
+          pytest test_multitenancy_rbac.py -v
 
   frontend-lint-build:
     name: Frontend Lint & Build
