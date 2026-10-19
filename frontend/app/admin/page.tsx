@@ -66,6 +66,7 @@ export default function AdminPage() {
     if (token && user?.role === "MASTER_ADMIN") {
       fetchTeamMembers();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, user]);
 
   const handleCreateUser = async (e: React.FormEvent) => {

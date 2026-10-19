@@ -171,6 +171,7 @@ export default function SimulatorPage() {
   // Initial Fetch on Component Mount
   useEffect(() => {
     fetchLedger();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
 
@@ -384,6 +385,12 @@ export default function SimulatorPage() {
                   Simulate an ingress transaction payload from core banking or payment gateway.
                 </p>
               </div>
+
+              {errorMessage && (
+                <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs">
+                  {errorMessage}
+                </div>
+              )}
 
               <form onSubmit={handleSubmit} className="space-y-4 text-xs">
                 {/* Tx ID & Amount */}

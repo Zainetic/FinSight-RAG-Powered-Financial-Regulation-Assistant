@@ -1,5 +1,6 @@
 # ⚖️ FinSight — AI-Powered RegTech Compliance Gatekeeper & Transaction Sandbox
 
+[![CI](https://github.com/Zainetic/FinSight-RAG-Powered-Financial-Regulation-Assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/Zainetic/FinSight-RAG-Powered-Financial-Regulation-Assistant/actions/workflows/ci.yml)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Next.js 16](https://img.shields.io/badge/Frontend-Next.js%2016-000000?style=flat&logo=next.js&logoColor=white)](https://nextjs.org)
 [![Multi-Tenancy](https://img.shields.io/badge/Architecture-B2B%20Multi--Tenant-blueviolet?style=flat)](#-multi-tenancy--rbac-architecture)

@@ -31,4 +31,9 @@ psycopg2-binary
 sqlalchemy
 asyncpg
 
+# --- Testing ---
+pytest
+pytest-asyncio
+httpx
+
 
