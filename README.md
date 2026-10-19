@@ -17,14 +17,6 @@ It evaluates software architectures, tokenization mechanisms, payment rails, and
 
 ---
 
-## 🎬 Demo
-
-Walkthrough of the FinSight authentication and onboarding flow:
-
-* 🎥 **Walkthrough Video**: [frontend/public/login.mp4](frontend/public/login.mp4)
-
----
-
 ## 📸 Screenshots
 
 * [ ] **TODO**: Add screenshot of 3-State Agentic Compliance Audit Dashboard (`/`)
