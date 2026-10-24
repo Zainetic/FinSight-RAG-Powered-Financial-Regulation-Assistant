@@ -1,0 +1,182 @@
+[
+  {
+    "id": "Q01",
+    "act": "PSD2",
+    "article": "Article 97",
+    "raw_file": "psd2_raw.txt",
+    "question": "What are the exact statutory requirements under PSD2 for applying Strong Customer Authentication (SCA) when a payer initiates an electronic payment transaction?",
+    "expected_topic": "Strong customer authentication requirements for remote electronic payments",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q02",
+    "act": "PSD2",
+    "article": "Article 66",
+    "raw_file": "psd2_raw.txt",
+    "question": "Under what statutory conditions may a payment initiation service provider (PISP) access a payer's payment account without establishing a contractual relationship with the account servicing payment service provider (ASPSP)?",
+    "expected_topic": "PISP access rights and communication interfaces with account servicing entities",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q03",
+    "act": "PSD2",
+    "article": "Article 98",
+    "raw_file": "psd2_raw.txt",
+    "question": "What mandates does PSD2 specify for EBA Regulatory Technical Standards (RTS) regarding exemptions to Strong Customer Authentication (SCA)?",
+    "expected_topic": "Regulatory technical standards and low-value/trusted beneficiary SCA exemptions",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q04",
+    "act": "GDPR",
+    "article": "Article 6",
+    "raw_file": "gdpr_raw.txt",
+    "question": "What constitutes a lawful basis for processing personal transaction data for legal compliance and anti-money laundering reporting under GDPR Article 6(1)(c)?",
+    "expected_topic": "Lawfulness of processing for compliance with legal obligations",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q05",
+    "act": "GDPR",
+    "article": "Article 17",
+    "raw_file": "gdpr_raw.txt",
+    "question": "How does the GDPR Article 17(3)(b) exemption apply to the right to erasure ('right to be forgotten') when financial records must be retained on an immutable audit ledger?",
+    "expected_topic": "Exemption from right to erasure for compliance with legal obligation in Union law",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q06",
+    "act": "GDPR",
+    "article": "Article 25",
+    "raw_file": "gdpr_raw.txt",
+    "question": "What technical and organizational measures (such as automated pseudonymization and PII masking) are required to satisfy Data Protection by Design and by Default?",
+    "expected_topic": "Data protection by design and default via automated pseudonymization",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q07",
+    "act": "MiCA",
+    "article": "Article 16",
+    "raw_file": "mica_raw.txt",
+    "question": "What authorization requirements must an issuer of Asset-Referenced Tokens (ART) meet before offering them publicly to the European Union market?",
+    "expected_topic": "Authorization and legal entity requirements for offering asset-referenced tokens",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q08",
+    "act": "MiCA",
+    "article": "Article 48",
+    "raw_file": "mica_raw.txt",
+    "question": "Under MiCA Article 48, which specific categories of entities are legally permitted to issue E-Money Tokens (EMTs) within the EU?",
+    "expected_topic": "Restriction of e-money token issuance to credit and electronic money institutions",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q09",
+    "act": "MiCA",
+    "article": "Article 88",
+    "raw_file": "mica_raw.txt",
+    "question": "What measures and systems are crypto-asset service providers required to establish to prevent and detect insider dealing and market manipulation?",
+    "expected_topic": "Prevention and detection of market abuse and suspicious transaction reporting",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q10",
+    "act": "DORA",
+    "article": "Article 5",
+    "raw_file": "dora_raw.txt",
+    "question": "What governance framework and operational controls must financial entities implement under DORA Article 5 for managing Information and Communication Technology (ICT) risk?",
+    "expected_topic": "ICT risk management framework and ultimate responsibility of the management body",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q11",
+    "act": "DORA",
+    "article": "Article 16",
+    "raw_file": "dora_raw.txt",
+    "question": "What simplified ICT risk management framework is available for small and non-interconnected entities under DORA Article 16?",
+    "expected_topic": "Simplified ICT risk management framework for small investment and payment firms",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q12",
+    "act": "DORA",
+    "article": "Article 28",
+    "raw_file": "dora_raw.txt",
+    "question": "What contractual and security principles must financial institutions enforce when managing third-party ICT service provider dependencies under DORA?",
+    "expected_topic": "General principles for managing ICT third-party risk and cloud provider outsourcing",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q13",
+    "act": "EU_AI_ACT",
+    "article": "Article 6",
+    "raw_file": "eu_ai_act_raw.txt",
+    "question": "Under the EU AI Act classification rules in Article 6 and Annex III, how are AI systems used for credit scoring and financial risk assessments classified?",
+    "expected_topic": "Classification of AI systems evaluating creditworthiness of natural persons as high-risk",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q14",
+    "act": "EU_AI_ACT",
+    "article": "Article 14",
+    "raw_file": "eu_ai_act_raw.txt",
+    "question": "What human oversight measures must high-risk AI decision systems incorporate to ensure natural persons can intervene, override, or halt automated verdicts?",
+    "expected_topic": "Human oversight design, human-in-the-loop controls, and automated stop interfaces",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q15",
+    "act": "EU_AI_ACT",
+    "article": "Article 50",
+    "raw_file": "eu_ai_act_raw.txt",
+    "question": "What transparency obligations apply to AI systems that generate or manipulate regulatory texts and synthetic compliance decisions?",
+    "expected_topic": "Transparency requirements for general-purpose AI and synthetic text generation",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q16",
+    "act": "TFR",
+    "article": "Article 14",
+    "raw_file": "tfr_raw.txt",
+    "question": "Under EU Regulation 2023/1113 (Transfer of Funds / Travel Rule), what originator and beneficiary identity data must accompany a crypto-asset transfer?",
+    "expected_topic": "Mandatory identity information accompanying crypto-asset transfers between CASPs",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q17",
+    "act": "TFR",
+    "article": "Article 16",
+    "raw_file": "tfr_raw.txt",
+    "question": "What obligations are imposed on intermediary Crypto-Asset Service Providers (CASPs) regarding incomplete or missing originator information during transmission?",
+    "expected_topic": "Obligations on intermediary CASPs to detect missing information and reject transfers",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q18",
+    "act": "AMLD5",
+    "article": "Article 30",
+    "raw_file": "amld5_raw.txt",
+    "question": "What statutory mandates did AMLD5 introduce regarding public and competent authority access to central registers of beneficial ownership?",
+    "expected_topic": "Central beneficial ownership registers and access conditions for obliged entities",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q19",
+    "act": "AMLD5",
+    "article": "Article 47",
+    "raw_file": "amld5_raw.txt",
+    "question": "What registration and licensing requirements are imposed on providers engaged in exchange services between virtual currencies and fiat currencies under AMLD5?",
+    "expected_topic": "Obligatory registration for virtual currency exchange and custodian wallet providers",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  },
+  {
+    "id": "Q20",
+    "act": "AMLD6",
+    "article": "Article 7",
+    "raw_file": "amld6_raw.txt",
+    "question": "Under Directive (EU) 2018/1673 (AMLD6), under what circumstances are legal persons held criminally liable for money laundering offenses committed for their benefit?",
+    "expected_topic": "Liability of legal persons for money laundering offenses committed by leading individuals",
+    "status": "DRAFT FOR ZAIN'S REVIEW"
+  }
+]
