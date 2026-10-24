@@ -174,7 +174,9 @@ async def seed_database():
         print("  - Inserted Org 2: Apex Credit AI (UUID: e5c18495...)")
 
         print("\n4. Seeding Users (Password: 'demo123')...")
-        hashed_demo_pw = hash_password("demo123")
+        hashed_demo_pw_dev = hash_password("dev12345")
+        hashed_demo_pw_manager = hash_password("manager12345")
+        hashed_demo_pw_admin = hash_password("admin12345")
 
         users_to_insert = [
             # Organization 1: Nordic Payments Group
@@ -182,7 +184,7 @@ async def seed_database():
                 "id": uuid.uuid4(),
                 "org_id": org1_id,
                 "email": "admin@nordicpayments.eu",
-                "hashed_password": hashed_demo_pw,
+                "hashed_password": hashed_demo_pw_admin,
                 "role": "MASTER_ADMIN",
                 "created_at": datetime.now(timezone.utc),
             },
@@ -190,7 +192,7 @@ async def seed_database():
                 "id": uuid.uuid4(),
                 "org_id": org1_id,
                 "email": "manager@nordicpayments.eu",
-                "hashed_password": hashed_demo_pw,
+                "hashed_password": hashed_demo_pw_manager,
                 "role": "MANAGER",
                 "created_at": datetime.now(timezone.utc),
             },
@@ -198,7 +200,7 @@ async def seed_database():
                 "id": uuid.uuid4(),
                 "org_id": org1_id,
                 "email": "dev@nordicpayments.eu",
-                "hashed_password": hashed_demo_pw,
+                "hashed_password": hashed_demo_pw_dev,
                 "role": "DEVELOPER",
                 "created_at": datetime.now(timezone.utc),
             },
@@ -207,7 +209,7 @@ async def seed_database():
                 "id": uuid.uuid4(),
                 "org_id": org2_id,
                 "email": "admin@apexcredit.ai",
-                "hashed_password": hashed_demo_pw,
+                "hashed_password": hashed_demo_pw_admin,
                 "role": "MASTER_ADMIN",
                 "created_at": datetime.now(timezone.utc),
             },
@@ -215,7 +217,7 @@ async def seed_database():
                 "id": uuid.uuid4(),
                 "org_id": org2_id,
                 "email": "manager@apexcredit.ai",
-                "hashed_password": hashed_demo_pw,
+                "hashed_password": hashed_demo_pw_manager,
                 "role": "MANAGER",
                 "created_at": datetime.now(timezone.utc),
             },
@@ -223,7 +225,7 @@ async def seed_database():
                 "id": uuid.uuid4(),
                 "org_id": org2_id,
                 "email": "dev@apexcredit.ai",
-                "hashed_password": hashed_demo_pw,
+                "hashed_password": hashed_demo_pw_dev,
                 "role": "DEVELOPER",
                 "created_at": datetime.now(timezone.utc),
             },
