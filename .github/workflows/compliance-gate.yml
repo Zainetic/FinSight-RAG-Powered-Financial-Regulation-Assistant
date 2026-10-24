@@ -8,20 +8,20 @@ on:
 jobs:
   run-compliance-audit:
     runs-on: ubuntu-latest
+    env:
+      FINSIGHT_URL: ${{ secrets.FINSIGHT_URL }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Check Scan Preconditions
-        if: ${{ github.event_name != 'workflow_dispatch' && secrets.FINSIGHT_URL == '' }}
+        if: github.event_name != 'workflow_dispatch' && env.FINSIGHT_URL == ''
         run: |
           echo "Compliance gate external scan skipped: FINSIGHT_URL repository secret is not set."
           echo "To enable automated PR compliance audits, configure the FINSIGHT_URL secret in repository settings."
 
       - name: Execute FInSIght Scan
-        if: ${{ github.event_name == 'workflow_dispatch' || secrets.FINSIGHT_URL != '' }}
-        env:
-          FINSIGHT_URL: ${{ secrets.FINSIGHT_URL }}
+        if: github.event_name == 'workflow_dispatch' || env.FINSIGHT_URL != ''
         run: |
           if [ -z "$FINSIGHT_URL" ]; then
             echo "FINSIGHT_URL secret is not configured. Skipping scan."
