@@ -173,7 +173,7 @@ async def seed_database():
         print("  - Inserted Org 1: Nordic Payments Group (UUID: d3b07384...)")
         print("  - Inserted Org 2: Apex Credit AI (UUID: e5c18495...)")
 
-        print("\n4. Seeding Users (Password: 'demo123')...")
+        print("\n4. Seeding Users (Role-Specific Passwords)...")
         hashed_demo_pw_dev = hash_password("dev12345")
         hashed_demo_pw_manager = hash_password("manager12345")
         hashed_demo_pw_admin = hash_password("admin12345")
@@ -390,10 +390,10 @@ async def seed_database():
 
     print("\n" + "=" * 70)
     print(" DATABASE SEEDED SUCCESSFULLY! ")
-    print(" Default Login Credentials (All Users): password = 'demo123'")
-    print("   1. Master Admin: admin@nordicpayments.eu")
-    print("   2. Manager:      manager@nordicpayments.eu")
-    print("   3. Developer:    dev@nordicpayments.eu")
+    print(" Default Login Credentials:")
+    print("   1. Master Admin: admin@nordicpayments.eu (password: 'admin12345')")
+    print("   2. Manager:      manager@nordicpayments.eu (password: 'manager12345')")
+    print("   3. Developer:    dev@nordicpayments.eu (password: 'dev12345')")
     print("=" * 70)
 
 
