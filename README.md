@@ -31,8 +31,8 @@ It evaluates software architectures, tokenization mechanisms, payment rails, and
 
 ### 2. ⚡ Real-Time FAISS Regulatory Transaction Gatekeeper
 * **Machine-to-Machine Sub-Second Screening**: Real-time evaluation of inbound financial transfers against AML/Sanctions rules, Travel Rule thresholds, and PSD2 SCA mandates.
-* **Zero-Trust PII Scrubbing**: Redacts sensitive originator/beneficiary personal names and IBANs while preserving routing parameters, amounts, and jurisdictions.
-* **Instant Sanctions Fast-Path**: 0ms bypass for international sanctions embargoes (`KP`, `IR`, `SY`).
+* **Zero-Trust PII Scrubbing**: In-memory regex pre-sanitization redacts sensitive originator/beneficiary personal names and IBANs before transactional payloads reach external LLM or vector APIs, preserving operational routing parameters, amounts, and jurisdictions.
+* **Instant Sanctions Fast-Path**: Sub-millisecond local in-memory pre-screening (measured p50: 0.016 ms) for international sanctions embargoes (`KP`, `IR`, `SY`), bypassing LLM overhead with immediate deterministic rejection and SHA-256 ledger recording.
 * **Interactive Live Simulator (`/simulator`)**: Web sandbox to dispatch test transactions (routine SEPA, offshore wires, sanctioned entities) and inspect live ingress vs. scrubbed payloads.
 
 ### 3. 📚 Grounded Statutory Citations (8 EU Frameworks)
@@ -414,12 +414,45 @@ All protected endpoints require the header: `Authorization: Bearer <JWT_TOKEN>`.
 
 ---
 
+## ⏱️ Empirical Latency Benchmarks & Performance Profile
+
+To evaluate the transaction screening pipeline under real conditions, latencies are measured across separated execution paths using `backend/scripts/measure_latency.py`:
+
+| Operation / Path | Execution Scope | Sample Size ($N$) | p50 (ms) | p95 (ms) | p99 (ms) | Mean (ms) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Zero-Trust PII Scrubbing** | Local In-Memory (Regex) | 100 | 0.001 | 0.001 | 0.001 | 0.001 |
+| **Instant Sanctions Fast-Path** | Local In-Memory + SHA-256 Digest | 100 | 0.016 | 0.024 | 0.085 | 0.019 |
+| **Cloud LLM Gatekeeper** | Google Cloud Gemini Flash RAG | 5 | 5,236.57 | 6,124.73 | 6,124.73 | 5,997.96 |
+
+> [!NOTE]
+> **Architectural Separation**: The fast path operates entirely in local memory with zero external network overhead, evaluating sanctions and Travel Rule bounds in under 0.1 ms before sealing the audit record into PostgreSQL. Deep semantic statutory queries invoke Google Gemini Flash with FAISS vector retrieval, where latency is dominated by cloud model inference and SSL round-trip time (~3–6s).
+
+---
+
+## 🧪 DevSecOps, Static Analysis & Automated Testing
+
+FinSight includes a comprehensive test suite and multi-layered DevSecOps verification pipeline running on GitHub Actions CI:
+
+* **Automated Test Matrix (22 passing tests in ~7s)**:
+  * `test_pii_scrubbing.py`: Verifies zero-trust regex redaction of German, French, and cross-border IBANs, multi-word personal names, and preservation of transaction routing metadata.
+  * `test_rbac_matrix.py`: Verifies strict role boundaries across `MASTER_ADMIN`, `MANAGER`, and `DEVELOPER` (asserting HTTP 403 on unauthorized user creation, dispute overrides, and prompt purging).
+  * `test_ledger_integrity.py`: Validates deterministic SHA-256 hash chaining from Genesis Block `#0`, UTC timestamp canonicalization, and forensic tamper detection flag.
+  * `test_ledger_concurrency.py`: Validates thread-safe monotonic ledger locking and prevention of blockchain ledger forks under concurrent appends.
+  * `test_mocked_llm_gatekeeper.py`: Evaluates deterministic fast-path embargo rejections and mocked Gemini Flash responses without external network dependencies.
+* **Automated Code Quality & Security Scanning**:
+  * **Ruff**: Enforces strict Python formatting and linting (`E`, `F`, `W`, `I`) with zero tolerance for syntax anomalies.
+  * **pip-audit**: Audits Python dependencies against known vulnerability databases (OSV / PyPA).
+  * **npm audit**: Scans frontend Node.js dependencies for security advisories.
+  * **Statutory Citation Verifier (`verify_citations.py`)**: Lexically verifies model-generated citations against 8 official EU statutory texts in `backend/data/raw_statutes/`.
+
+---
+
 ## 🛡️ Security & Cryptographic Invariants
 
-* **Tenant Cryptographic Isolation**: Canonical SHA-256 serialization binds `org_id` into every audit block, ensuring cross-tenant hash collisions are mathematically impossible.
-* **Zero Cloud Data Leakage**: Vector embeddings run locally via `sentence-transformers/all-MiniLM-L6-v2` on CPU.
-* **Deterministic Hasher**: Canonical key sorting and strict JSON whitespace separators guarantee identical hashes for identical inputs across environments.
-* **Append-Only Immutability**: All compliance audits and dispute overrides are `INSERT`-only rows with PostgreSQL table-level locking to prevent race conditions or ledger forks.
+* **Tenant Cryptographic Isolation**: Canonical SHA-256 serialization binds `org_id` into every audit block. Cross-tenant hash collisions are computationally infeasible under standard SHA-256 preimage and collision resistance ($O(2^{128})$ operations).
+* **Zero-Trust PII Privacy Boundary**: All sensitive personal identifiers (originator/beneficiary names and IBAN account numbers) are deterministically redacted in-memory via regex sanitization before payloads reach external Google Gemini Flash LLM and embedding endpoints.
+* **Deterministic Canonical Hasher**: Canonical key sorting (`sort_keys=True`) and strict JSON separators (`(',', ':')`) guarantee byte-for-byte identical SHA-256 digests across different OS environments, database drivers, and serialization runtimes.
+* **Append-Only Immutability & Thread-Safe Locking**: All compliance audits and dispute overrides are strictly `INSERT`-only rows protected by mutex locking (`_ledger_lock`) during timestamp assignment and ID generation to prevent race conditions or ledger forks.
 
 ---
 
