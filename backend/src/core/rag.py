@@ -21,7 +21,6 @@ from typing import List, Optional, Any, Dict
 from pydantic import BaseModel, Field
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_community.vectorstores import FAISS
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from src.core.llm import get_gemini_llm
 
 # Dynamically calculate project root to prevent broken relative paths
@@ -119,17 +118,18 @@ class ComplianceJudgment(BaseModel):
 # 2. Thread-Safe Singleton Cache for Embeddings & Vector Store
 # =====================================================================
 
-_embeddings_instance: Optional[GoogleGenerativeAIEmbeddings] = None
+_embeddings_instance: Optional[Any] = None
 _vector_db_instance: Optional[FAISS] = None
 _store_lock = threading.RLock()
 
 
-def get_embeddings() -> GoogleGenerativeAIEmbeddings:
+def get_embeddings() -> Any:
     """Returns a thread-safe singleton instance of GoogleGenerativeAIEmbeddings."""
     global _embeddings_instance
     if _embeddings_instance is None:
         with _store_lock:
             if _embeddings_instance is None:
+                from langchain_google_genai.embeddings import GoogleGenerativeAIEmbeddings
                 model_name = DEFAULT_EMBEDDING_MODEL
                 if model_name in ["models/embedding-001", "embedding-001"]:
                     model_name = "models/gemini-embedding-001"

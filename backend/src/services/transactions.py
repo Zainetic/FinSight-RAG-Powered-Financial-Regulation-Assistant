@@ -16,13 +16,24 @@ import threading
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
 from src.schemas.transaction import TransactionPayload, TransactionEvaluationResult
-from src.core.rag import get_vector_store, clean_regulatory_text
 
 
 SANCTIONED_COUNTRIES = {"KP", "IR", "SY"}
 HIGH_RISK_JURISDICTIONS = {"KY", "PA", "VG", "BS", "RU"}
+
+
+def get_vector_store():
+    """Lazily load vector store to prevent circular/hanging top-level imports."""
+    from src.core.rag import get_vector_store as _gvs
+    return _gvs()
+
+
+def clean_regulatory_text(text: str) -> str:
+    """Lazily delegate text cleaning to rag module."""
+    from src.core.rag import clean_regulatory_text as _crt
+    return _crt(text)
 
 _fast_llm_instance: Optional[ChatGoogleGenerativeAI] = None
 _fast_llm_lock = threading.Lock()
