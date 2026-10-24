@@ -55,9 +55,8 @@ export default function LoginPage() {
     }
   };
 
-  const triggerDemoLogin = async (demoEmail: string) => {
+  const triggerDemoLogin = async (demoEmail: string, demoPw: string) => {
     if (isLoading) return;
-    const demoPw = "demo123";
     setEmail(demoEmail);
     setPassword(demoPw);
     setIsLoading(true);
@@ -85,7 +84,6 @@ export default function LoginPage() {
       router.push("/");
     } catch (err: unknown) {
       const message =
-
         err instanceof Error
           ? err.message
           : "Failed to connect to authentication server.";
@@ -259,12 +257,12 @@ export default function LoginPage() {
               <div className="pt-3 space-y-2 border-t border-white/10">
                 <div className="flex items-center justify-between text-[10px] text-white/40 uppercase tracking-wider font-mono">
                   <span>Fast-Track Demo Access</span>
-                  <span>pw: demo123</span>
+                  <span>1-Click Sign-In</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
-                    onClick={() => triggerDemoLogin("dev@nordicpayments.eu")}
+                    onClick={() => triggerDemoLogin("dev@nordicpayments.eu", "dev12345")}
                     disabled={isLoading}
                     className="px-2.5 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 hover:border-emerald-500/35 text-xs font-mono transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 text-center flex flex-col items-center justify-center space-y-0.5 shadow-sm"
                   >
@@ -274,7 +272,7 @@ export default function LoginPage() {
 
                   <button
                     type="button"
-                    onClick={() => triggerDemoLogin("manager@nordicpayments.eu")}
+                    onClick={() => triggerDemoLogin("manager@nordicpayments.eu", "manager12345")}
                     disabled={isLoading}
                     className="px-2.5 py-2.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/20 hover:border-sky-500/35 text-xs font-mono transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 text-center flex flex-col items-center justify-center space-y-0.5 shadow-sm"
                   >
@@ -284,7 +282,7 @@ export default function LoginPage() {
 
                   <button
                     type="button"
-                    onClick={() => triggerDemoLogin("admin@nordicpayments.eu")}
+                    onClick={() => triggerDemoLogin("admin@nordicpayments.eu", "admin12345")}
                     disabled={isLoading}
                     className="px-2.5 py-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/20 hover:border-purple-500/35 text-xs font-mono transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 text-center flex flex-col items-center justify-center space-y-0.5 shadow-sm"
                   >
