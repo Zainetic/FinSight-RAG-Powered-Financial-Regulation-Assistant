@@ -1,8 +1,9 @@
 import os
 import sys
 import uuid
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 # Ensure UTF-8 stdout on Windows
@@ -34,9 +35,9 @@ os.environ["DATABASE_URL"] = db_url
 os.environ.setdefault("JWT_SECRET_KEY", "ci-test-secret-key-32-chars-long-2026")
 os.environ.setdefault("GEMINI_MODEL", "gemini-3.6-flash")
 
-from src.core.database import init_db, get_db_connection
-from src.core.ledger import init_ledger_table
 from src.api.main import app
+from src.core.database import get_db_connection, init_db
+from src.core.ledger import init_ledger_table
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -64,7 +65,7 @@ def test_organization():
         with conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO organizations (id, name, created_at) VALUES (%s, %s, %s)",
-                (org_id, org_name, datetime.now(timezone.utc))
+                (org_id, org_name, datetime.now(UTC)),
             )
         conn.commit()
 

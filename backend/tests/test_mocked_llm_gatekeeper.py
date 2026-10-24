@@ -5,9 +5,10 @@ and mocked LLM structured outputs without hitting external cloud APIs.
 """
 
 from unittest.mock import MagicMock, patch
-from src.schemas.transaction import TransactionPayload, TransactionEvaluationResult
+
+from src.core.auth import UserRole, create_access_token
+from src.schemas.transaction import TransactionEvaluationResult, TransactionPayload
 from src.services.transactions import evaluate_transaction
-from src.core.auth import create_access_token, UserRole
 
 
 def test_instant_sanctions_fastpath_kp():
@@ -18,7 +19,7 @@ def test_instant_sanctions_fastpath_kp():
         originator_country="FR",
         beneficiary_country="KP",  # North Korea (Sanctioned)
         payment_method="SEPA",
-        sca_authenticated=True
+        sca_authenticated=True,
     )
 
     result = evaluate_transaction(tx)
@@ -39,7 +40,7 @@ def test_instant_sanctions_fastpath_ir():
         originator_country="IR",  # Iran (Sanctioned)
         beneficiary_country="DE",
         payment_method="FIAT_WIRE",
-        sca_authenticated=True
+        sca_authenticated=True,
     )
 
     result = evaluate_transaction(tx)
@@ -57,7 +58,7 @@ def test_unauthenticated_high_value_sca_fallback():
         originator_country="FR",
         beneficiary_country="DE",
         payment_method="OPEN_BANKING_PIS",
-        sca_authenticated=False  # Violation of PSD2 Art 97
+        sca_authenticated=False,  # Violation of PSD2 Art 97
     )
 
     with patch("src.services.transactions.get_vector_store", return_value=None):
@@ -76,7 +77,7 @@ def test_mocked_llm_approved_transaction():
         beneficiary_country="IT",
         payment_method="SEPA_INSTANT",
         sca_authenticated=True,
-        asset_type="FIAT"
+        asset_type="FIAT",
     )
 
     mock_llm_result = TransactionEvaluationResult(
@@ -87,11 +88,13 @@ def test_mocked_llm_approved_transaction():
         primary_violations=[],
         applicable_regulations=["PSD2 Directive (EU) 2015/2366 Article 97"],
         audit_rationale="Transfer complies with SEPA Instant standards and Strong Customer Authentication mandates.",
-        citations=[{
-            "document": "PSD2 Directive (EU) 2015/2366",
-            "page": "Article 97",
-            "quoted_text": "Payment service providers shall apply strong customer authentication where the payer initiates an electronic payment transaction."
-        }]
+        citations=[
+            {
+                "document": "PSD2 Directive (EU) 2015/2366",
+                "page": "Article 97",
+                "quoted_text": "Payment service providers shall apply strong customer authentication where the payer initiates an electronic payment transaction.",
+            }
+        ],
     )
 
     mock_structured_llm = MagicMock()
@@ -100,8 +103,10 @@ def test_mocked_llm_approved_transaction():
     mock_base_llm = MagicMock()
     mock_base_llm.with_structured_output.return_value = mock_structured_llm
 
-    with patch("src.services.transactions.get_vector_store", return_value=None), \
-         patch("src.services.transactions.get_fast_transaction_llm", return_value=mock_base_llm):
+    with (
+        patch("src.services.transactions.get_vector_store", return_value=None),
+        patch("src.services.transactions.get_fast_transaction_llm", return_value=mock_base_llm),
+    ):
         result = evaluate_transaction(tx)
         assert result.verdict == "APPROVED"
         assert result.is_compliant is True
@@ -111,17 +116,22 @@ def test_mocked_llm_approved_transaction():
 
 def test_mocked_streaming_evaluate_route(client, test_organization):
     org_id = test_organization["id"]
-    token = create_access_token({
-        "id": "test-user-id",
-        "sub": "tester@test.org",
-        "email": "tester@test.org",
-        "org_id": org_id,
-        "role": UserRole.DEVELOPER.value,
-        "org_name": test_organization["name"]
-    })
+    token = create_access_token(
+        {
+            "id": "test-user-id",
+            "sub": "tester@test.org",
+            "email": "tester@test.org",
+            "org_id": org_id,
+            "role": UserRole.DEVELOPER.value,
+            "org_name": test_organization["name"],
+        }
+    )
 
     async def mock_stream_generator(*args, **kwargs):
-        yield {"type": "start", "citations": [{"document": "GDPR", "page": "Article 25", "quoted_text": "Data protection by design."}]}
+        yield {
+            "type": "start",
+            "citations": [{"document": "GDPR", "page": "Article 25", "quoted_text": "Data protection by design."}],
+        }
         yield {"type": "token", "content": "Compliant architecture: "}
         yield {"type": "token", "content": "All applicable EU statutory requirements satisfied."}
 
@@ -132,9 +142,9 @@ def test_mocked_streaming_evaluate_route(client, test_organization):
                 "query": "Evaluating our data architecture for privacy by design under GDPR Art 25.",
                 "jurisdictions": ["EU (AI Act, GDPR, PSD2)"],
                 "history": [],
-                "mode": "strict"
+                "mode": "strict",
             },
-            headers={"Authorization": f"Bearer {token}"}
+            headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code == 200
         assert "text/event-stream" in response.headers.get("content-type", "")

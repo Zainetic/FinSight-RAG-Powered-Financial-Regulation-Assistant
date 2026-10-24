@@ -1,74 +1,54 @@
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
+
 from pydantic import BaseModel, Field, model_validator
 
 
 class TransactionPayload(BaseModel):
-    transaction_id: str = Field(
-        default="",
-        description="Unique transaction identifier",
-        example="TX-2026-948172"
-    )
-    amount: float = Field(
-        ...,
-        gt=0,
-        description="Transaction monetary amount",
-        example=25000.00
-    )
-    currency: str = Field(
-        default="EUR",
-        description="ISO 4217 Currency Code",
-        example="EUR"
-    )
-    originator_name: Optional[str] = Field(
+    transaction_id: str = Field(default="", description="Unique transaction identifier", example="TX-2026-948172")
+    amount: float = Field(..., gt=0, description="Transaction monetary amount", example=25000.00)
+    currency: str = Field(default="EUR", description="ISO 4217 Currency Code", example="EUR")
+    originator_name: str | None = Field(
         default=None,
         description="Full legal name of the originator entity or individual",
-        example="Acme Global Corp Ltd"
+        example="Acme Global Corp Ltd",
     )
     originator_country: str = Field(
-        default="EU",
-        description="ISO 2-letter country code of the originator",
-        example="FR"
+        default="EU", description="ISO 2-letter country code of the originator", example="FR"
     )
-    beneficiary_name: Optional[str] = Field(
+    beneficiary_name: str | None = Field(
         default=None,
         description="Full legal name of the beneficiary entity or individual",
-        example="Horizon Trade Partners"
+        example="Horizon Trade Partners",
     )
     beneficiary_country: str = Field(
-        default="EU",
-        description="ISO 2-letter country code of the beneficiary",
-        example="DE"
+        default="EU", description="ISO 2-letter country code of the beneficiary", example="DE"
     )
     payment_method: str = Field(
         default="SEPA_INSTANT",
         description="Payment channel or rail (e.g., 'SEPA', 'OPEN_BANKING_PIS', 'CRYPTO_TRANSFER', 'CARD', 'FIAT_WIRE')",
-        example="SEPA_INSTANT"
+        example="SEPA_INSTANT",
     )
     sca_authenticated: bool = Field(
-        default=True,
-        description="Whether Strong Customer Authentication (SCA) was executed",
-        example=True
+        default=True, description="Whether Strong Customer Authentication (SCA) was executed", example=True
     )
-    asset_type: Optional[str] = Field(
+    asset_type: str | None = Field(
         default="FIAT",
         description="Financial asset classification (e.g., 'FIAT', 'E_MONEY_TOKEN', 'UTILITY_TOKEN', 'ALGORITHMIC_TOKEN')",
-        example="FIAT"
+        example="FIAT",
     )
-    metadata: Optional[Dict[str, Any]] = Field(
-        default_factory=dict,
-        description="Additional technical metadata, telemetry, or headers",
-        example={}
+    metadata: dict[str, Any] | None = Field(
+        default_factory=dict, description="Additional technical metadata, telemetry, or headers", example={}
     )
 
     # Legacy & Simulator Field Aliases
-    tx_id: Optional[str] = None
-    sender_name: Optional[str] = None
-    sender_iban: Optional[str] = None
-    sender_country: Optional[str] = None
-    receiver_name: Optional[str] = None
-    receiver_iban: Optional[str] = None
-    receiver_country: Optional[str] = None
-    sender_kyc_level: Optional[str] = None
+    tx_id: str | None = None
+    sender_name: str | None = None
+    sender_iban: str | None = None
+    sender_country: str | None = None
+    receiver_name: str | None = None
+    receiver_iban: str | None = None
+    receiver_country: str | None = None
+    sender_kyc_level: str | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -90,7 +70,9 @@ class TransactionPayload(BaseModel):
                 data["sender_name"] = str(data["originator_name"])
 
             # Map sender_country <-> originator_country
-            if "sender_country" in data and (not data.get("originator_country") or data.get("originator_country") == "EU"):
+            if "sender_country" in data and (
+                not data.get("originator_country") or data.get("originator_country") == "EU"
+            ):
                 data["originator_country"] = str(data["sender_country"]).strip().upper()
             elif "originator_country" in data and not data.get("sender_country"):
                 data["sender_country"] = str(data["originator_country"]).strip().upper()
@@ -102,7 +84,9 @@ class TransactionPayload(BaseModel):
                 data["receiver_name"] = str(data["beneficiary_name"])
 
             # Map receiver_country <-> beneficiary_country
-            if "receiver_country" in data and (not data.get("beneficiary_country") or data.get("beneficiary_country") == "EU"):
+            if "receiver_country" in data and (
+                not data.get("beneficiary_country") or data.get("beneficiary_country") == "EU"
+            ):
                 data["beneficiary_country"] = str(data["receiver_country"]).strip().upper()
             elif "beneficiary_country" in data and not data.get("receiver_country"):
                 data["receiver_country"] = str(data["beneficiary_country"]).strip().upper()
@@ -116,9 +100,7 @@ class TransactionPayload(BaseModel):
 
 
 class TransactionEvaluationResult(BaseModel):
-    transaction_id: str = Field(
-        description="Unique identifier of the evaluated transaction"
-    )
+    transaction_id: str = Field(description="Unique identifier of the evaluated transaction")
     verdict: Literal["APPROVED", "FLAGGED", "BLOCKED", "PASS", "FAIL"] = Field(
         description="Final regulatory decision. Must be strictly 'APPROVED' (PASS) if the transaction complies with statutory requirements. Use 'FLAGGED' for suspicious anomalies, and 'BLOCKED' (FAIL) for explicit legal violations."
     )
@@ -128,44 +110,31 @@ class TransactionEvaluationResult(BaseModel):
     is_compliant: bool = Field(
         description="Strictly True if the transfer fully complies with all applicable EU regulations (PSD2, TFR, MiCA, AMLD6). False if blocked or flagged."
     )
-    primary_violations: List[str] = Field(
-        default_factory=list,
-        description="List of specific statutory violations or missing required controls"
+    primary_violations: list[str] = Field(
+        default_factory=list, description="List of specific statutory violations or missing required controls"
     )
-    applicable_regulations: List[str] = Field(
+    applicable_regulations: list[str] = Field(
         default_factory=list,
-        description="List of applicable statutory articles retrieved from FAISS (e.g., ['PSD2 Art. 97', 'TFR Regulation (EU) 2023/1113 Art. 14', 'MiCA Art. 50'])"
+        description="List of applicable statutory articles retrieved from FAISS (e.g., ['PSD2 Art. 97', 'TFR Regulation (EU) 2023/1113 Art. 14', 'MiCA Art. 50'])",
     )
     audit_rationale: str = Field(
         description="Concise, authoritative technical justification explaining why the transfer passed, was flagged, or was blocked"
     )
-    citations: Optional[List[Dict[str, str]]] = Field(
+    citations: list[dict[str, str]] | None = Field(
         default_factory=list,
-        description="List of regulatory citations retrieved from FAISS formatted as [{'document': '...', 'page': '...', 'quoted_text': '...'}]"
+        description="List of regulatory citations retrieved from FAISS formatted as [{'document': '...', 'page': '...', 'quoted_text': '...'}]",
     )
 
     # Cryptographic Ledger and UI Integration Metadata
-    rule_triggered: Optional[str] = Field(
-        default=None,
-        description="Rule or trigger condition for dashboard telemetry"
+    rule_triggered: str | None = Field(default=None, description="Rule or trigger condition for dashboard telemetry")
+    legal_basis: str | None = Field(default=None, description="Primary statutory legal citation for dashboard display")
+    sha256_audit_hash: str | None = Field(
+        default=None, description="Cryptographic SHA-256 hash digest of the evaluation record"
     )
-    legal_basis: Optional[str] = Field(
-        default=None,
-        description="Primary statutory legal citation for dashboard display"
+    timestamp: str | None = Field(default=None, description="ISO 8601 UTC timestamp of the audit evaluation")
+    raw_payload_preview: dict[str, Any] | None = Field(
+        default=None, description="Preview of incoming payload prior to sanitization"
     )
-    sha256_audit_hash: Optional[str] = Field(
-        default=None,
-        description="Cryptographic SHA-256 hash digest of the evaluation record"
-    )
-    timestamp: Optional[str] = Field(
-        default=None,
-        description="ISO 8601 UTC timestamp of the audit evaluation"
-    )
-    raw_payload_preview: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="Preview of incoming payload prior to sanitization"
-    )
-    scrubbed_payload_sent_to_engine: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="Zero-trust scrubbed payload forwarded to compliance evaluation engine"
+    scrubbed_payload_sent_to_engine: dict[str, Any] | None = Field(
+        default=None, description="Zero-trust scrubbed payload forwarded to compliance evaluation engine"
     )

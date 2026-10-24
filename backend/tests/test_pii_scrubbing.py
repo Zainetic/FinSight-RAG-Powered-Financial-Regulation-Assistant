@@ -50,7 +50,7 @@ def test_scrub_transaction_pii_preserves_technical_parameters():
         sca_authenticated=True,
         asset_type="FIAT",
         sender_iban="FR7630006000011234567890189",
-        receiver_iban="DE89370400440532013000"
+        receiver_iban="DE89370400440532013000",
     )
 
     scrubbed = scrub_transaction_pii(tx)

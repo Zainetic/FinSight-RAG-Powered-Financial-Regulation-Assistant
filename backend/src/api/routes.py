@@ -1,24 +1,21 @@
+import json
 import os
 import uuid
-import json
-from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Depends, Query, status
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from src.core.auth import (
-    get_current_user,
-    CurrentUser,
-    UserRole
-)
-from src.core.rag import query_compliance_engine, astream_compliance_engine
+from src.core.auth import CurrentUser, UserRole, get_current_user
 from src.core.database import save_compliance_record
 from src.core.ledger import (
     append_compliance_record,
-    override_ledger_record,
     get_recent_ledger_blocks,
-    verify_ledger_chain
+    override_ledger_record,
+    verify_ledger_chain,
 )
+from src.core.rag import astream_compliance_engine, query_compliance_engine
 
 router = APIRouter(tags=["Compliance & Ledger API"])
 
@@ -27,60 +24,61 @@ router = APIRouter(tags=["Compliance & Ledger API"])
 # 1. Pydantic Request & Response Schemas
 # =====================================================================
 
+
 class EvaluateRequest(BaseModel):
     query: str = Field(
         ...,
         min_length=5,
         description="Architectural description or data flow to evaluate against regional regulations.",
-        example="We are building a payment gateway that categorizes users based on biometric facial recognition."
+        example="We are building a payment gateway that categorizes users based on biometric facial recognition.",
     )
-    jurisdictions: Optional[List[str]] = Field(
+    jurisdictions: list[str] | None = Field(
         default_factory=lambda: ["EU (AI Act, GDPR, PSD2)"],
         description="Target legal jurisdictions for multi-regional FAISS filtering",
-        example=["EU (AI Act, GDPR, PSD2)", "US (CCPA/CPRA)"]
+        example=["EU (AI Act, GDPR, PSD2)", "US (CCPA/CPRA)"],
     )
-    history: Optional[List[Dict[str, str]]] = Field(
+    history: list[dict[str, str]] | None = Field(
         default=[],
-        description="List of previous conversation turns formatted as [{'role': 'user'|'assistant', 'content': '...'}]"
+        description="List of previous conversation turns formatted as [{'role': 'user'|'assistant', 'content': '...'}]",
     )
-    mode: Optional[str] = Field(
+    mode: str | None = Field(
         default="strict",
-        description="Evaluation mode: 'strict' (3-state agentic auditing) or 'lenient' (scope-limited demo mode)"
+        description="Evaluation mode: 'strict' (3-state agentic auditing) or 'lenient' (scope-limited demo mode)",
     )
 
 
 class EvaluateResponse(BaseModel):
     audit_id: str
-    org_id: Optional[str] = None
+    org_id: str | None = None
     tx_hash: str
     prev_hash: str
     timestamp: str
     risk_category: str
     is_compliant: bool
     executive_summary_markdown: str
-    citations: List[Dict[str, Any]]
-    jurisdictions: List[str]
-    ledger_receipt: Optional[Dict[str, Any]] = None
+    citations: list[dict[str, Any]]
+    jurisdictions: list[str]
+    ledger_receipt: dict[str, Any] | None = None
 
 
 class OverrideRequest(BaseModel):
     audit_id: str = Field(
         ...,
         description="UUID of the original compliance audit record being disputed",
-        example="3fa85f64-5717-4562-b3fc-2c963f66afa6"
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     )
     justification: str = Field(
         ...,
         min_length=10,
         description="Legal justification or regulatory exemption for manual override",
-        example="Biometric categorization is strictly localized on-device with zero cloud transmission under GDPR Art. 9(2)(a)."
+        example="Biometric categorization is strictly localized on-device with zero cloud transmission under GDPR Art. 9(2)(a).",
     )
 
 
 class OverrideResponse(BaseModel):
     audit_id: str
     original_audit_id: str
-    org_id: Optional[str] = None
+    org_id: str | None = None
     timestamp: str
     model_provenance: str
     prev_hash: str
@@ -91,30 +89,27 @@ class OverrideResponse(BaseModel):
 
 class WebhookPayload(BaseModel):
     repo_name: str = Field(
-        ...,
-        description="Repository identifier or URL from CI/CD pipeline",
-        example="fintech-gateway/payments-service"
+        ..., description="Repository identifier or URL from CI/CD pipeline", example="fintech-gateway/payments-service"
     )
     commit_hash: str = Field(
         ...,
         min_length=7,
         description="Git commit SHA being audited",
-        example="9f8a3c2b1d0e4f5a6b7c8d9e0f1a2b3c4d5e6f7a"
+        example="9f8a3c2b1d0e4f5a6b7c8d9e0f1a2b3c4d5e6f7a",
     )
     architecture_changes: str = Field(
         ...,
         min_length=5,
         description="Proposed architectural specification or diff to audit against regional regulations",
-        example="We are implementing a customer profiling feature using automated facial biometrics for credit scoring."
+        example="We are implementing a customer profiling feature using automated facial biometrics for credit scoring.",
     )
-    jurisdictions: Optional[List[str]] = Field(
+    jurisdictions: list[str] | None = Field(
         default=None,
         description="Optional list of target legal jurisdictions to filter (e.g. ['EU', 'UK', 'US'])",
-        example=["EU", "UK"]
+        example=["EU", "UK"],
     )
-    mode: Optional[str] = Field(
-        default="strict",
-        description="Evaluation mode for automated CI/CD pipeline ('strict' or 'lenient')"
+    mode: str | None = Field(
+        default="strict", description="Evaluation mode for automated CI/CD pipeline ('strict' or 'lenient')"
     )
 
 
@@ -122,15 +117,16 @@ class WebhookScanResponse(BaseModel):
     audit_id: str
     is_compliant: bool
     tx_hash: str
-    org_id: Optional[str] = None
-    repo_name: Optional[str] = None
-    commit_hash: Optional[str] = None
-    risk_category: Optional[str] = None
+    org_id: str | None = None
+    repo_name: str | None = None
+    commit_hash: str | None = None
+    risk_category: str | None = None
 
 
 # =====================================================================
 # 2. Next.js Enterprise RESTful Streaming Routes
 # =====================================================================
+
 
 @router.post(
     "/api/v1/evaluate",
@@ -139,22 +135,19 @@ class WebhookScanResponse(BaseModel):
         "Executes high-speed LangChain RAG streaming against FAISS with full multi-turn conversational memory, "
         "streams generated Markdown tokens in real-time via Server-Sent Events (SSE), "
         "and anchors the final compliance judgment into the tenant's immutable SHA-256 PostgreSQL ledger."
-    )
+    ),
 )
-async def evaluate_architecture(
-    request: EvaluateRequest,
-    current_user: CurrentUser = Depends(get_current_user)
-):
+async def evaluate_architecture(request: EvaluateRequest, current_user: CurrentUser = Depends(get_current_user)):
     async def sse_generator():
-        accumulated_tokens: List[str] = []
-        citations: List[Dict[str, Any]] = []
+        accumulated_tokens: list[str] = []
+        citations: list[dict[str, Any]] = []
 
         try:
             async for event in astream_compliance_engine(
                 user_query=request.query.strip(),
                 jurisdictions=request.jurisdictions,
                 history=request.history,
-                mode=request.mode or "strict"
+                mode=request.mode or "strict",
             ):
                 if event.get("type") == "start":
                     citations = event.get("citations", [])
@@ -164,7 +157,9 @@ async def evaluate_architecture(
                     if isinstance(raw_content, str):
                         content_str = raw_content
                     elif isinstance(raw_content, list):
-                        content_str = "".join(str(item.get("text", item) if isinstance(item, dict) else item) for item in raw_content)
+                        content_str = "".join(
+                            str(item.get("text", item) if isinstance(item, dict) else item) for item in raw_content
+                        )
                     else:
                         content_str = str(raw_content)
                     accumulated_tokens.append(content_str)
@@ -174,10 +169,21 @@ async def evaluate_architecture(
 
             # Classify risk & compliance based on 3-state agentic matrix or generated report
             lower_summary = full_summary_text.lower()
-            if "pending clarification" in lower_summary or "pending information" in lower_summary or "⏳ pending" in lower_summary or "### ❓ required clarifications" in lower_summary:
+            if (
+                "pending clarification" in lower_summary
+                or "pending information" in lower_summary
+                or "⏳ pending" in lower_summary
+                or "### ❓ required clarifications" in lower_summary
+            ):
                 risk_category = "Pending Clarification"
                 is_compliant = False
-            elif "compliant architecture" in lower_summary or "all applicable eu statutory requirements satisfied" in lower_summary or "compliant with controls" in lower_summary or "status: ✅" in lower_summary or "verified compliance controls" in lower_summary:
+            elif (
+                "compliant architecture" in lower_summary
+                or "all applicable eu statutory requirements satisfied" in lower_summary
+                or "compliant with controls" in lower_summary
+                or "status: ✅" in lower_summary
+                or "verified compliance controls" in lower_summary
+            ):
                 risk_category = "Minimal Risk"
                 is_compliant = True
             elif "prohibited" in lower_summary:
@@ -209,7 +215,7 @@ async def evaluate_architecture(
                 "org_id": current_user.org_id,
                 "evaluated_by": current_user.email,
                 "role": current_user.role.value,
-                "mode": request.mode or "strict"
+                "mode": request.mode or "strict",
             }
 
             # Commit to immutable PostgreSQL SHA-256 ledger scoped to tenant's org_id
@@ -218,12 +224,10 @@ async def evaluate_architecture(
                 user_query=request.query.strip(),
                 payload=audit_payload,
                 model_provenance=model_provenance,
-                org_id=current_user.org_id
+                org_id=current_user.org_id,
             )
             save_compliance_record(
-                user_query=request.query.strip(),
-                result_dict=audit_payload,
-                org_id=current_user.org_id
+                user_query=request.query.strip(), result_dict=audit_payload, org_id=current_user.org_id
             )
 
             done_event = {
@@ -237,7 +241,7 @@ async def evaluate_architecture(
                 "is_compliant": is_compliant,
                 "citations": citations,
                 "jurisdictions": request.jurisdictions or ["EU (Default)"],
-                "executive_summary_markdown": full_summary_text
+                "executive_summary_markdown": full_summary_text,
             }
             yield f"data: {json.dumps(done_event)}\n\n"
 
@@ -248,11 +252,7 @@ async def evaluate_architecture(
     return StreamingResponse(
         sse_generator(),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache, no-transform",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
-        }
+        headers={"Cache-Control": "no-cache, no-transform", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
     )
 
 
@@ -265,17 +265,14 @@ async def evaluate_architecture(
         "Appends a new dispute override block linked to the latest transaction hash in the "
         "organization's immutable SHA-256 PostgreSQL ledger. "
         "Access is restricted to MANAGER and MASTER_ADMIN roles (DEVELOPER returns 403 Forbidden)."
-    )
+    ),
 )
-async def override_judgment(
-    request: OverrideRequest,
-    current_user: CurrentUser = Depends(get_current_user)
-):
+async def override_judgment(request: OverrideRequest, current_user: CurrentUser = Depends(get_current_user)):
     # Strict RBAC Constraint: DEVELOPER role cannot perform manual overrides
     if current_user.role == UserRole.DEVELOPER:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access Denied: Users with DEVELOPER role are unauthorized to perform manual compliance overrides. Requires MANAGER or MASTER_ADMIN role."
+            detail="Access Denied: Users with DEVELOPER role are unauthorized to perform manual compliance overrides. Requires MANAGER or MASTER_ADMIN role.",
         )
 
     try:
@@ -283,13 +280,13 @@ async def override_judgment(
             audit_id=request.audit_id.strip(),
             justification=request.justification.strip(),
             org_id=current_user.org_id,
-            operator_email=current_user.email
+            operator_email=current_user.email,
         )
 
         if not override_receipt:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to append dispute override block to organization ledger."
+                detail="Failed to append dispute override block to organization ledger.",
             )
 
         return OverrideResponse(
@@ -301,32 +298,25 @@ async def override_judgment(
             prev_hash=override_receipt["prev_hash"],
             tx_hash=override_receipt["tx_hash"],
             status=override_receipt["status"],
-            justification=override_receipt["justification"]
+            justification=override_receipt["justification"],
         )
 
     except ValueError as ve:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(ve)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Dispute override failed: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Dispute override failed: {e!s}")
 
 
 @router.get(
     "/api/v1/ledger",
     status_code=status.HTTP_200_OK,
     summary="Fetch Recent Organization Ledger Blocks (Authenticated)",
-    description="Retrieves the most recent cryptographic ledger blocks from PostgreSQL for the user's organization with row-level data isolation."
+    description="Retrieves the most recent cryptographic ledger blocks from PostgreSQL for the user's organization with row-level data isolation.",
 )
 async def get_ledger_blocks(
-    limit: int = Query(default=10, ge=1, le=100),
-    current_user: CurrentUser = Depends(get_current_user)
+    limit: int = Query(default=10, ge=1, le=100), current_user: CurrentUser = Depends(get_current_user)
 ):
     try:
         blocks = get_recent_ledger_blocks(org_id=current_user.org_id, limit=limit)
@@ -337,12 +327,11 @@ async def get_ledger_blocks(
             "chain_valid": is_valid,
             "total_blocks_verified": count,
             "verification_error": error_msg,
-            "blocks": blocks
+            "blocks": blocks,
         }
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch ledger blocks: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to fetch ledger blocks: {e!s}"
         )
 
 
@@ -350,27 +339,25 @@ async def get_ledger_blocks(
 # 3. CI/CD Automated Webhook Routes
 # =====================================================================
 
+
 @router.post(
     "/api/v1/scan-repo",
     response_model=WebhookScanResponse,
     responses={
         200: {"description": "Architecture is compliant. CI/CD build approved."},
         403: {"description": "Architecture violates regional regulations. CI/CD build blocked."},
-        503: {"description": "Vector store or RAG engine unavailable."}
+        503: {"description": "Vector store or RAG engine unavailable."},
     },
     summary="CI/CD Automated Architecture Audit Webhook",
-    description="GitHub Action webhook returning 200 for compliant architectures and 403 to block CI/CD if non-compliant."
+    description="GitHub Action webhook returning 200 for compliant architectures and 403 to block CI/CD if non-compliant.",
 )
-async def scan_repo_webhook(
-    payload: WebhookPayload,
-    current_user: CurrentUser = Depends(get_current_user)
-):
+async def scan_repo_webhook(payload: WebhookPayload, current_user: CurrentUser = Depends(get_current_user)):
     try:
         result = query_compliance_engine(
             user_query=payload.architecture_changes.strip(),
             jurisdictions=payload.jurisdictions,
             history=[],
-            mode=payload.mode or "strict"
+            mode=payload.mode or "strict",
         )
 
         audit_payload = {
@@ -382,18 +369,18 @@ async def scan_repo_webhook(
                 "source": "GITHUB_ACTIONS_WEBHOOK",
                 "org_id": current_user.org_id,
                 "triggered_by": current_user.email,
-                "mode": payload.mode or "strict"
-            }
+                "mode": payload.mode or "strict",
+            },
         }
 
         model_provenance = f"CI_CD_SCANNER ({os.getenv('GEMINI_MODEL', 'gemini-3.6-flash')})"
         audit_query_label = f"[{payload.repo_name} @ {payload.commit_hash[:8]}] {payload.architecture_changes.strip()}"
-        
+
         ledger_receipt = append_compliance_record(
             user_query=audit_query_label,
             payload=audit_payload,
             model_provenance=model_provenance,
-            org_id=current_user.org_id
+            org_id=current_user.org_id,
         )
 
         save_compliance_record(audit_query_label, audit_payload, org_id=current_user.org_id)
@@ -410,32 +397,21 @@ async def scan_repo_webhook(
             "tx_hash": tx_hash,
             "repo_name": payload.repo_name,
             "commit_hash": payload.commit_hash,
-            "risk_category": risk_category
+            "risk_category": risk_category,
         }
 
         if not is_compliant:
-            return JSONResponse(
-                status_code=status.HTTP_403_FORBIDDEN,
-                content=response_body
-            )
+            return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content=response_body)
 
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content=response_body
-        )
+        return JSONResponse(status_code=status.HTTP_200_OK, content=response_body)
 
     except FileNotFoundError as fnf:
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Vector store unavailable: {str(fnf)}"
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Vector store unavailable: {fnf!s}"
         )
     except ValueError as ve:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(ve)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Automated compliance evaluation failed: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Automated compliance evaluation failed: {e!s}"
         )

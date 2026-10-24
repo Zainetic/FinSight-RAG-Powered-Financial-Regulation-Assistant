@@ -46,6 +46,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
+          pip install ruff pip-audit
+
+      - name: Code Quality & Linting (ruff)
+        working-directory: backend
+        run: |
+          ruff check .
+
+      - name: Dependency Vulnerability Audit (pip-audit)
+        working-directory: backend
+        run: |
+          pip-audit -r requirements.txt || echo "::warning::Known dependency advisories detected. Review backend/requirements.txt."
 
       - name: Run Backend Tests with Pytest
         working-directory: backend
@@ -53,7 +64,7 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/finsight_db
           JWT_SECRET_KEY: ci-test-secret-key-32-chars-long-2026
         run: |
-          pytest test_multitenancy_rbac.py -v
+          pytest tests test_multitenancy_rbac.py -v -p no:warnings
 
   frontend-lint-build:
     name: Frontend Lint & Build
@@ -73,6 +84,11 @@ jobs:
       - name: Install Frontend Dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: Dependency Security Audit (npm audit)
+        working-directory: frontend
+        run: |
+          npm audit --audit-level=high || echo "::warning::High-severity advisories detected in upstream frontend dependencies."
 
       - name: Run Frontend Lint
         working-directory: frontend

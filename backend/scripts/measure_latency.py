@@ -8,10 +8,9 @@ Strictly separates:
 """
 
 import os
+import statistics
 import sys
 import time
-import statistics
-from typing import List, Dict, Any, Optional
 
 if sys.platform == "win32":
     try:
@@ -32,10 +31,10 @@ load_dotenv(os.path.join(ROOT_DIR, ".env"))
 load_dotenv(os.path.join(BACKEND_DIR, ".env"))
 
 from src.schemas.transaction import TransactionPayload
-from src.services.transactions import scrub_transaction_pii, evaluate_transaction
+from src.services.transactions import evaluate_transaction, scrub_transaction_pii
 
 
-def calculate_percentiles(latencies_ms: List[float]) -> Dict[str, float]:
+def calculate_percentiles(latencies_ms: list[float]) -> dict[str, float]:
     sorted_lats = sorted(latencies_ms)
     n = len(sorted_lats)
     p50_idx = int(0.50 * (n - 1))
@@ -53,7 +52,7 @@ def calculate_percentiles(latencies_ms: List[float]) -> Dict[str, float]:
     }
 
 
-def benchmark_pii_scrubbing(iterations: int = 100) -> Dict[str, float]:
+def benchmark_pii_scrubbing(iterations: int = 100) -> dict[str, float]:
     tx = TransactionPayload(
         transaction_id="TX-BENCH-PII-001",
         amount=18450.00,
@@ -66,7 +65,7 @@ def benchmark_pii_scrubbing(iterations: int = 100) -> Dict[str, float]:
         sca_authenticated=True,
         asset_type="FIAT",
         sender_iban="FR7630006000011234567890189",
-        receiver_iban="DE89370400440532013000"
+        receiver_iban="DE89370400440532013000",
     )
 
     # Warmup
@@ -83,7 +82,7 @@ def benchmark_pii_scrubbing(iterations: int = 100) -> Dict[str, float]:
     return calculate_percentiles(latencies_ms)
 
 
-def benchmark_sanctions_fastpath(iterations: int = 100) -> Dict[str, float]:
+def benchmark_sanctions_fastpath(iterations: int = 100) -> dict[str, float]:
     tx = TransactionPayload(
         transaction_id="TX-BENCH-SANCTION-001",
         amount=50000.00,
@@ -92,7 +91,7 @@ def benchmark_sanctions_fastpath(iterations: int = 100) -> Dict[str, float]:
         beneficiary_country="KP",  # Sanctioned
         payment_method="FIAT_WIRE",
         sca_authenticated=True,
-        asset_type="FIAT"
+        asset_type="FIAT",
     )
 
     # Warmup
@@ -110,14 +109,14 @@ def benchmark_sanctions_fastpath(iterations: int = 100) -> Dict[str, float]:
     return calculate_percentiles(latencies_ms)
 
 
-def benchmark_cloud_llm(iterations: int = 10) -> Optional[Dict[str, float]]:
+def benchmark_cloud_llm(iterations: int = 10) -> dict[str, float] | None:
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key or "your_" in api_key.lower():
         print("ℹ️ GOOGLE_API_KEY not configured or placeholder. Skipping Cloud LLM benchmark.", flush=True)
         return None
 
-    from src.services.transactions import get_fast_transaction_llm
     from src.schemas.transaction import TransactionEvaluationResult
+    from src.services.transactions import get_fast_transaction_llm
 
     llm = get_fast_transaction_llm()
     structured_llm = llm.with_structured_output(TransactionEvaluationResult)
@@ -149,20 +148,17 @@ def benchmark_cloud_llm(iterations: int = 10) -> Optional[Dict[str, float]]:
     for i in range(iterations):
         try:
             t0 = time.perf_counter()
-            res = structured_llm.invoke([
-                ("system", system_prompt),
-                ("human", human_content)
-            ])
+            res = structured_llm.invoke([("system", system_prompt), ("human", human_content)])
             t1 = time.perf_counter()
             dur = (t1 - t0) * 1000.0
             latencies_ms.append(dur)
             verdict = getattr(res, "verdict", "UNKNOWN")
-            print(f"  Iteration {i+1}/{iterations}: {dur:.2f} ms (verdict={verdict})", flush=True)
+            print(f"  Iteration {i + 1}/{iterations}: {dur:.2f} ms (verdict={verdict})", flush=True)
             # Short pause to prevent burst rate limit / 503 errors on external API
             if i < iterations - 1:
                 time.sleep(1.0)
         except Exception as e:
-            print(f"  Benchmark stopped at iteration {i+1} due to API limit: {e}", flush=True)
+            print(f"  Benchmark stopped at iteration {i + 1} due to API limit: {e}", flush=True)
             break
 
     if not latencies_ms:
@@ -177,13 +173,25 @@ if __name__ == "__main__":
 
     print("\n1. Measuring Zero-Trust PII Scrubbing (100 iterations)...", flush=True)
     pii_metrics = benchmark_pii_scrubbing(100)
-    print(f"   p50: {pii_metrics['p50_ms']:.4f} ms | p95: {pii_metrics['p95_ms']:.4f} ms | p99: {pii_metrics['p99_ms']:.4f} ms", flush=True)
-    print(f"   min: {pii_metrics['min_ms']:.4f} ms | mean: {pii_metrics['mean_ms']:.4f} ms | max: {pii_metrics['max_ms']:.4f} ms", flush=True)
+    print(
+        f"   p50: {pii_metrics['p50_ms']:.4f} ms | p95: {pii_metrics['p95_ms']:.4f} ms | p99: {pii_metrics['p99_ms']:.4f} ms",
+        flush=True,
+    )
+    print(
+        f"   min: {pii_metrics['min_ms']:.4f} ms | mean: {pii_metrics['mean_ms']:.4f} ms | max: {pii_metrics['max_ms']:.4f} ms",
+        flush=True,
+    )
 
     print("\n2. Measuring Instant Sanctions Fast-Path (100 iterations)...", flush=True)
     sanctions_metrics = benchmark_sanctions_fastpath(100)
-    print(f"   p50: {sanctions_metrics['p50_ms']:.4f} ms | p95: {sanctions_metrics['p95_ms']:.4f} ms | p99: {sanctions_metrics['p99_ms']:.4f} ms", flush=True)
-    print(f"   min: {sanctions_metrics['min_ms']:.4f} ms | mean: {sanctions_metrics['mean_ms']:.4f} ms | max: {sanctions_metrics['max_ms']:.4f} ms", flush=True)
+    print(
+        f"   p50: {sanctions_metrics['p50_ms']:.4f} ms | p95: {sanctions_metrics['p95_ms']:.4f} ms | p99: {sanctions_metrics['p99_ms']:.4f} ms",
+        flush=True,
+    )
+    print(
+        f"   min: {sanctions_metrics['min_ms']:.4f} ms | mean: {sanctions_metrics['mean_ms']:.4f} ms | max: {sanctions_metrics['max_ms']:.4f} ms",
+        flush=True,
+    )
 
     print("\n3. Measuring Cloud LLM Path (Gemini Flash)...", flush=True)
     llm_metrics = benchmark_cloud_llm(5)
@@ -193,10 +201,16 @@ if __name__ == "__main__":
     print("=" * 70)
     print("| Operation | Scope | Iterations | p50 (ms) | p95 (ms) | p99 (ms) | Mean (ms) |")
     print("| :--- | :---: | :---: | :---: | :---: | :---: | :---: |")
-    print(f"| **Zero-Trust PII Scrubbing** | Local In-Memory | 100 | {pii_metrics['p50_ms']:.3f} | {pii_metrics['p95_ms']:.3f} | {pii_metrics['p99_ms']:.3f} | {pii_metrics['mean_ms']:.3f} |")
-    print(f"| **Instant Sanctions Fast-Path** | Local In-Memory + SHA-256 | 100 | {sanctions_metrics['p50_ms']:.3f} | {sanctions_metrics['p95_ms']:.3f} | {sanctions_metrics['p99_ms']:.3f} | {sanctions_metrics['mean_ms']:.3f} |")
+    print(
+        f"| **Zero-Trust PII Scrubbing** | Local In-Memory | 100 | {pii_metrics['p50_ms']:.3f} | {pii_metrics['p95_ms']:.3f} | {pii_metrics['p99_ms']:.3f} | {pii_metrics['mean_ms']:.3f} |"
+    )
+    print(
+        f"| **Instant Sanctions Fast-Path** | Local In-Memory + SHA-256 | 100 | {sanctions_metrics['p50_ms']:.3f} | {sanctions_metrics['p95_ms']:.3f} | {sanctions_metrics['p99_ms']:.3f} | {sanctions_metrics['mean_ms']:.3f} |"
+    )
     if llm_metrics:
-        print(f"| **Cloud LLM Gatekeeper** | Google Cloud Gemini Flash | {llm_metrics['count']} | {llm_metrics['p50_ms']:.2f} | {llm_metrics['p95_ms']:.2f} | {llm_metrics['p99_ms']:.2f} | {llm_metrics['mean_ms']:.2f} |")
+        print(
+            f"| **Cloud LLM Gatekeeper** | Google Cloud Gemini Flash | {llm_metrics['count']} | {llm_metrics['p50_ms']:.2f} | {llm_metrics['p95_ms']:.2f} | {llm_metrics['p99_ms']:.2f} | {llm_metrics['mean_ms']:.2f} |"
+        )
     else:
         print("| **Cloud LLM Gatekeeper** | Google Cloud Gemini Flash | N/A (Offline) | N/A | N/A | N/A | N/A |")
     print("=" * 70)

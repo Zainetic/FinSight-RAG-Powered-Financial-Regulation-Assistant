@@ -5,21 +5,22 @@ and that hashes are deterministic with strict tenant isolation.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from src.core.database import get_db_connection
 from src.core.ledger import (
+    GENESIS_HASH,
+    append_compliance_record,
     compute_canonical_hash,
     create_genesis_block,
-    append_compliance_record,
     override_ledger_record,
     verify_ledger_chain,
-    GENESIS_HASH
 )
 
 
 def test_deterministic_hashing_and_tenant_isolation():
     audit_id = uuid.uuid4()
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     org_1 = str(uuid.uuid4())
     org_2 = str(uuid.uuid4())
     payload = {"status": "COMPLIANT", "risk_category": "Minimal Risk"}
@@ -31,7 +32,7 @@ def test_deterministic_hashing_and_tenant_isolation():
         user_query="SEPA instant payment audit",
         payload=payload,
         prev_hash=GENESIS_HASH,
-        org_id=org_1
+        org_id=org_1,
     )
 
     # Identical inputs must yield identical hash
@@ -42,7 +43,7 @@ def test_deterministic_hashing_and_tenant_isolation():
         user_query="SEPA instant payment audit",
         payload=payload,
         prev_hash=GENESIS_HASH,
-        org_id=org_1
+        org_id=org_1,
     )
     assert hash_a == hash_a_recomputed
     assert len(hash_a) == 64
@@ -55,7 +56,7 @@ def test_deterministic_hashing_and_tenant_isolation():
         user_query="SEPA instant payment audit",
         payload=payload,
         prev_hash=GENESIS_HASH,
-        org_id=org_2
+        org_id=org_2,
     )
     assert hash_a != hash_b
 
@@ -71,20 +72,12 @@ def test_genesis_block_and_linear_chaining(test_organization):
     genesis_tx_hash = genesis["tx_hash"]
 
     # 2. Append Block #1
-    rec1 = append_compliance_record(
-        user_query="Audit 1",
-        payload={"is_compliant": True, "turn": 1},
-        org_id=org_id
-    )
+    rec1 = append_compliance_record(user_query="Audit 1", payload={"is_compliant": True, "turn": 1}, org_id=org_id)
     assert rec1 is not None
     assert rec1["prev_hash"] == genesis_tx_hash
 
     # 3. Append Block #2
-    rec2 = append_compliance_record(
-        user_query="Audit 2",
-        payload={"is_compliant": False, "turn": 2},
-        org_id=org_id
-    )
+    rec2 = append_compliance_record(user_query="Audit 2", payload={"is_compliant": False, "turn": 2}, org_id=org_id)
     assert rec2 is not None
     assert rec2["prev_hash"] == rec1["tx_hash"]
 
@@ -93,7 +86,7 @@ def test_genesis_block_and_linear_chaining(test_organization):
         audit_id=rec2["audit_id"],
         justification="Manual risk mitigation confirmed by compliance team",
         org_id=org_id,
-        operator_email="admin@test.org"
+        operator_email="admin@test.org",
     )
     assert override is not None
     assert override["prev_hash"] == rec2["tx_hash"]
@@ -121,11 +114,14 @@ def test_tamper_detection_breaks_verification(test_organization):
     # Tamper with Block 1 payload directly in PostgreSQL (simulating unauthorized DB tampering)
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE compliance_ledger 
                 SET payload = '{"flag": "TAMPERED_BY_ATTACKER"}'::jsonb
                 WHERE audit_id = %s;
-            """, (rec1["audit_id"],))
+            """,
+                (rec1["audit_id"],),
+            )
         conn.commit()
 
     # Re-run verification -> Must immediately detect tampering at Block index 1
@@ -146,11 +142,14 @@ def test_tampered_prev_hash_breaks_chain_link(test_organization):
     corrupted_hash = "f" * 64
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE compliance_ledger 
                 SET prev_hash = %s
                 WHERE audit_id = %s;
-            """, (corrupted_hash, rec2["audit_id"]))
+            """,
+                (corrupted_hash, rec2["audit_id"]),
+            )
         conn.commit()
 
     is_valid, broken_idx, error_msg = verify_ledger_chain(org_id)

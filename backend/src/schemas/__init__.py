@@ -1,3 +1,3 @@
-from src.schemas.transaction import TransactionPayload, TransactionEvaluationResult
+from src.schemas.transaction import TransactionEvaluationResult, TransactionPayload
 
-__all__ = ["TransactionPayload", "TransactionEvaluationResult"]
+__all__ = ["TransactionEvaluationResult", "TransactionPayload"]

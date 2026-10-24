@@ -1,16 +1,16 @@
 import asyncio
+import hashlib
+import json
 import os
+import socket
 import sys
 import uuid
-import json
-import hashlib
-import socket
 from datetime import datetime, timezone
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy import text
-from passlib.context import CryptContext
 from dotenv import load_dotenv
+from passlib.context import CryptContext
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 
 # Ensure backend root is on sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -24,6 +24,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 def hash_password(password: str) -> str:
     """Hashes a password with bcrypt."""
     import bcrypt
+
     salt = bcrypt.gensalt(rounds=12)
     return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
@@ -35,7 +36,7 @@ def compute_canonical_hash(
     user_query: str,
     payload: dict,
     prev_hash: str,
-    org_id: str
+    org_id: str,
 ) -> str:
     """
     Computes deterministic SHA-256 hash matching backend/src/core/ledger.py.
@@ -47,15 +48,10 @@ def compute_canonical_hash(
         "payload": payload,
         "prev_hash": str(prev_hash),
         "timestamp": timestamp_utc.isoformat(),
-        "user_query": str(user_query)
+        "user_query": str(user_query),
     }
 
-    canonical_bytes = json.dumps(
-        canonical_dict,
-        sort_keys=True,
-        separators=(",", ":"),
-        default=str
-    ).encode("utf-8")
+    canonical_bytes = json.dumps(canonical_dict, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
 
     return hashlib.sha256(canonical_bytes).hexdigest()
 
@@ -66,7 +62,7 @@ def get_async_db_url() -> str:
     Converts postgresql:// to postgresql+asyncpg:// and handles host fallback.
     """
     raw_url = os.getenv("DATABASE_URL", "postgresql://postgres:admin@localhost:5432/finsight_db")
-    
+
     # Check if host 'db' is reachable (Docker environment check)
     if "@db:" in raw_url:
         try:
@@ -100,15 +96,18 @@ async def seed_database():
         await conn.execute(text("DROP TABLE IF EXISTS organizations CASCADE;"))
 
         print("2. Creating schema with multi-tenant tables and indexes...")
-        await conn.execute(text("""
+        await conn.execute(
+            text("""
             CREATE TABLE organizations (
                 id UUID PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
-        """))
+        """)
+        )
 
-        await conn.execute(text("""
+        await conn.execute(
+            text("""
             CREATE TABLE users (
                 id UUID PRIMARY KEY,
                 org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -117,9 +116,11 @@ async def seed_database():
                 role VARCHAR(50) NOT NULL CHECK (role IN ('DEVELOPER', 'MANAGER', 'MASTER_ADMIN')),
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
-        """))
+        """)
+        )
 
-        await conn.execute(text("""
+        await conn.execute(
+            text("""
             CREATE TABLE compliance_ledger (
                 audit_id UUID PRIMARY KEY,
                 org_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
@@ -130,9 +131,11 @@ async def seed_database():
                 prev_hash CHAR(64) NOT NULL,
                 tx_hash CHAR(64) NOT NULL UNIQUE
             );
-        """))
+        """)
+        )
 
-        await conn.execute(text("""
+        await conn.execute(
+            text("""
             CREATE TABLE compliance_logs (
                 id SERIAL PRIMARY KEY,
                 org_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
@@ -142,7 +145,8 @@ async def seed_database():
                 is_compliant BOOLEAN NOT NULL,
                 full_json_payload JSONB NOT NULL
             );
-        """))
+        """)
+        )
 
         await conn.execute(text("CREATE INDEX idx_organizations_name ON organizations (name);"))
         await conn.execute(text("CREATE INDEX idx_users_email ON users (email);"))
@@ -151,7 +155,9 @@ async def seed_database():
         await conn.execute(text("CREATE INDEX idx_compliance_ledger_timestamp ON compliance_ledger (timestamp);"))
         await conn.execute(text("CREATE INDEX idx_compliance_ledger_prev_hash ON compliance_ledger (prev_hash);"))
         await conn.execute(text("CREATE INDEX idx_compliance_ledger_tx_hash ON compliance_ledger (tx_hash);"))
-        await conn.execute(text("CREATE INDEX idx_compliance_ledger_payload_gin ON compliance_ledger USING gin (payload);"))
+        await conn.execute(
+            text("CREATE INDEX idx_compliance_ledger_payload_gin ON compliance_ledger USING gin (payload);")
+        )
 
         print("3. Seeding Organizations...")
         org1_id = uuid.UUID("d3b07384-d113-4966-9c0e-698b80b2a6f1")
@@ -162,7 +168,7 @@ async def seed_database():
             [
                 {"id": org1_id, "name": "Nordic Payments Group", "created_at": datetime.now(timezone.utc)},
                 {"id": org2_id, "name": "Apex Credit AI", "created_at": datetime.now(timezone.utc)},
-            ]
+            ],
         )
         print("  - Inserted Org 1: Nordic Payments Group (UUID: d3b07384...)")
         print("  - Inserted Org 2: Apex Credit AI (UUID: e5c18495...)")
@@ -229,7 +235,7 @@ async def seed_database():
                     INSERT INTO users (id, org_id, email, hashed_password, role, created_at)
                     VALUES (:id, :org_id, :email, :hashed_password, :role, :created_at)
                 """),
-                u
+                u,
             )
             print(f"  - User: {u['email']} [{u['role']}]")
 
@@ -247,7 +253,7 @@ async def seed_database():
             "org_name": "Nordic Payments Group",
             "admin_email": "admin@nordicpayments.eu",
             "chain_version": "v1.0-sha256",
-            "status": "ANCHORED"
+            "status": "ANCHORED",
         }
         b0_prev = genesis_hash
         b0_tx = compute_canonical_hash(b0_id, b0_time, b0_prov, b0_query, b0_payload, b0_prev, str(org1_id))
@@ -266,14 +272,14 @@ async def seed_database():
                 {
                     "document": "PSD2 Regulatory Technical Standards (EU) 2018/389",
                     "page": "12",
-                    "quoted_text": "Payment service providers shall be allowed not to apply strong customer authentication where the payer initiates a remote electronic payment transaction identified by the payment service provider as posing a low level of risk according to the transaction monitoring mechanisms."
+                    "quoted_text": "Payment service providers shall be allowed not to apply strong customer authentication where the payer initiates a remote electronic payment transaction identified by the payment service provider as posing a low level of risk according to the transaction monitoring mechanisms.",
                 },
                 {
                     "document": "GDPR (EU) 2016/679",
                     "page": "38",
-                    "quoted_text": "Processing shall be lawful only if processing is necessary for the purposes of the legitimate interests pursued by the controller or by a third party."
-                }
-            ]
+                    "quoted_text": "Processing shall be lawful only if processing is necessary for the purposes of the legitimate interests pursued by the controller or by a third party.",
+                },
+            ],
         }
         b1_prev = b0_tx
         b1_tx = compute_canonical_hash(b1_id, b1_time, b1_prov, b1_query, b1_payload, b1_prev, str(org1_id))
@@ -292,14 +298,14 @@ async def seed_database():
                 {
                     "document": "EU AI Act 2024/1689",
                     "page": "84",
-                    "quoted_text": "Biometric identification and categorisation systems intended to be used for the evaluation of natural persons shall be classified as high-risk AI systems."
+                    "quoted_text": "Biometric identification and categorisation systems intended to be used for the evaluation of natural persons shall be classified as high-risk AI systems.",
                 },
                 {
                     "document": "GDPR (EU) 2016/679",
                     "page": "46",
-                    "quoted_text": "The data subject shall have the right not to be subject to a decision based solely on automated processing, including profiling, which produces legal effects concerning him or her."
-                }
-            ]
+                    "quoted_text": "The data subject shall have the right not to be subject to a decision based solely on automated processing, including profiling, which produces legal effects concerning him or her.",
+                },
+            ],
         }
         b2_prev = b1_tx
         b2_tx = compute_canonical_hash(b2_id, b2_time, b2_prov, b2_query, b2_payload, b2_prev, str(org1_id))
@@ -316,7 +322,7 @@ async def seed_database():
             "actor_email": "manager@nordicpayments.eu",
             "justification": "Biometric verification is executed entirely localized on Secure Enclave mobile hardware with zero remote cloud transmission under GDPR Art. 9(2)(a) explicit consent and satisfies human-in-the-loop escalation criteria.",
             "risk_category": "OVERRIDDEN",
-            "is_compliant": True
+            "is_compliant": True,
         }
         b3_prev = b2_tx
         b3_tx = compute_canonical_hash(b3_id, b3_time, b3_prov, b3_query, b3_payload, b3_prev, str(org1_id))
@@ -335,14 +341,14 @@ async def seed_database():
                 {
                     "document": "PSD2 Directive (EU) 2015/2366",
                     "page": "55",
-                    "quoted_text": "Account servicing payment service providers shall allow payment initiation service providers and account information service providers to rely on the authentication procedures provided by the account servicing payment service provider to the payment service user."
+                    "quoted_text": "Account servicing payment service providers shall allow payment initiation service providers and account information service providers to rely on the authentication procedures provided by the account servicing payment service provider to the payment service user.",
                 },
                 {
                     "document": "PSD2 Regulatory Technical Standards (EU) 2018/389",
                     "page": "19",
-                    "quoted_text": "Payment service providers shall ensure secure communication between the software application of the payment service user and the payment service provider."
-                }
-            ]
+                    "quoted_text": "Payment service providers shall ensure secure communication between the software application of the payment service user and the payment service provider.",
+                },
+            ],
         }
         b4_prev = b3_tx
         b4_tx = compute_canonical_hash(b4_id, b4_time, b4_prov, b4_query, b4_payload, b4_prev, str(org1_id))
@@ -373,7 +379,7 @@ async def seed_database():
                     "payload": json.dumps(b_pl),
                     "prev_hash": b_prev_h,
                     "tx_hash": b_tx_h,
-                }
+                },
             )
             print(f"  - Block #{i}: {b_q[:45]}...")
             print(f"      prev_hash: {b_prev_h[:16]}...  ->  tx_hash: {b_tx_h[:16]}...")

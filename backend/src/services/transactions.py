@@ -9,16 +9,16 @@ Provides 100% deterministic M2M financial transaction compliance evaluations:
 4. Sub-second zero-trust PII masking and SHA-256 cryptographic ledger anchoring.
 """
 
-import os
-import json
 import hashlib
+import json
+import os
 import threading
-from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
-from src.schemas.transaction import TransactionPayload, TransactionEvaluationResult
 
+from src.schemas.transaction import TransactionEvaluationResult, TransactionPayload
 
 SANCTIONED_COUNTRIES = {"KP", "IR", "SY"}
 HIGH_RISK_JURISDICTIONS = {"KY", "PA", "VG", "BS", "RU"}
@@ -27,15 +27,18 @@ HIGH_RISK_JURISDICTIONS = {"KY", "PA", "VG", "BS", "RU"}
 def get_vector_store():
     """Lazily load vector store to prevent circular/hanging top-level imports."""
     from src.core.rag import get_vector_store as _gvs
+
     return _gvs()
 
 
 def clean_regulatory_text(text: str) -> str:
     """Lazily delegate text cleaning to rag module."""
     from src.core.rag import clean_regulatory_text as _crt
+
     return _crt(text)
 
-_fast_llm_instance: Optional[ChatGoogleGenerativeAI] = None
+
+_fast_llm_instance: ChatGoogleGenerativeAI | None = None
 _fast_llm_lock = threading.Lock()
 
 
@@ -54,16 +57,12 @@ def get_fast_transaction_llm() -> ChatGoogleGenerativeAI:
 
                 model_name = os.getenv("GEMINI_TRANSACTION_MODEL", "gemini-flash-lite-latest")
                 _fast_llm_instance = ChatGoogleGenerativeAI(
-                    model=model_name,
-                    temperature=0.0,
-                    max_output_tokens=600,
-                    max_retries=1,
-                    request_timeout=15.0
+                    model=model_name, temperature=0.0, max_output_tokens=600, max_retries=1, request_timeout=15.0
                 )
     return _fast_llm_instance
 
 
-def mask_iban(iban: Optional[str]) -> str:
+def mask_iban(iban: str | None) -> str:
     """
     Masks the middle portion of an IBAN while preserving country and check prefixes.
     Example: 'DE89370400440532013000' -> 'DE89************3000'
@@ -79,7 +78,7 @@ def mask_iban(iban: Optional[str]) -> str:
     return f"{prefix}{masked_middle}{suffix}"
 
 
-def scrub_transaction_pii(tx: TransactionPayload) -> Dict[str, Any]:
+def scrub_transaction_pii(tx: TransactionPayload) -> dict[str, Any]:
     """
     Zero-Trust PII Sanitizer for ingress payloads.
     Redacts personal names and full IBAN accounts while preserving technical routing codes.
@@ -98,7 +97,7 @@ def scrub_transaction_pii(tx: TransactionPayload) -> Dict[str, Any]:
         "sca_authenticated": bool(tx.sca_authenticated),
         "asset_type": (tx.asset_type or "FIAT").strip(),
         "sender_kyc_level": (tx.sender_kyc_level or "standard").strip().lower(),
-        "metadata": tx.metadata or {}
+        "metadata": tx.metadata or {},
     }
 
 
@@ -111,7 +110,7 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
     4. Evaluates compliance via deterministic Flash model (temperature=0.0, max 600 tokens).
     5. Computes deterministic SHA-256 cryptographic audit digest.
     """
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     timestamp = now_utc.isoformat()
     scrubbed = scrub_transaction_pii(tx)
 
@@ -128,14 +127,16 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
     # 1. Immediate Sanctions Fast-Path (0ms bypass)
     if orig_country in SANCTIONED_COUNTRIES or benef_country in SANCTIONED_COUNTRIES:
         target_country = orig_country if orig_country in SANCTIONED_COUNTRIES else benef_country
-        rationale = f"Blocked: {target_country} is subject to comprehensive international financial sanctions and FATF embargo."
+        rationale = (
+            f"Blocked: {target_country} is subject to comprehensive international financial sanctions and FATF embargo."
+        )
         violations = [f"International Sanctions Embargo ({target_country})"]
         applicable_regs = ["EU Regulation 2024/1624 Art. 29", "FATF Blacklist"]
         sanction_citations = [
             {
                 "document": "EU Regulation 2024/1624",
                 "page": "Article 29",
-                "quoted_text": "Credit institutions and financial entities are prohibited from processing, clearing, or executing fund transfers originating from or destined for territories subject to international sanctions and asset freeze directives."
+                "quoted_text": "Credit institutions and financial entities are prohibited from processing, clearing, or executing fund transfers originating from or destined for territories subject to international sanctions and asset freeze directives.",
             }
         ]
 
@@ -148,7 +149,7 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
             "applicable_regulations": applicable_regs,
             "audit_rationale": rationale,
             "scrubbed_payload": scrubbed,
-            "timestamp": timestamp
+            "timestamp": timestamp,
         }
         canonical_json = json.dumps(hash_payload, sort_keys=True, separators=(",", ":"))
         sha256_audit_hash = hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
@@ -167,7 +168,7 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
             sha256_audit_hash=sha256_audit_hash,
             timestamp=timestamp,
             raw_payload_preview=tx.model_dump(),
-            scrubbed_payload_sent_to_engine=scrubbed
+            scrubbed_payload_sent_to_engine=scrubbed,
         )
 
     # 2. Query Formulation & FAISS Retrieval (k=3)
@@ -176,8 +177,8 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
         f"SCA: {sca_auth}, Asset: {asset_type}, KYC: {kyc_level}"
     )
 
-    context_snippets: List[str] = []
-    extracted_citations: List[Dict[str, str]] = []
+    context_snippets: list[str] = []
+    extracted_citations: list[dict[str, str]] = []
     top_legal_basis = "EU Financial Regulatory Framework (AMLD6, TFR, PSD2, MiCA)"
 
     try:
@@ -185,24 +186,32 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
         if vector_store:
             retrieved_docs = vector_store.similarity_search(search_query, k=3)
             for idx, doc in enumerate(retrieved_docs):
-                source_act = doc.metadata.get("source", doc.metadata.get("source_act", doc.metadata.get("document", "EU Regulation")))
-                art_label = doc.metadata.get("article_label", doc.metadata.get("article_title", doc.metadata.get("page", f"Article {doc.metadata.get('article_number', 'General')}")))
+                source_act = doc.metadata.get(
+                    "source", doc.metadata.get("source_act", doc.metadata.get("document", "EU Regulation"))
+                )
+                art_label = doc.metadata.get(
+                    "article_label",
+                    doc.metadata.get(
+                        "article_title",
+                        doc.metadata.get("page", f"Article {doc.metadata.get('article_number', 'General')}"),
+                    ),
+                )
                 title = doc.metadata.get("title", "")
-                
+
                 if title and title != f"{source_act} - {art_label}":
-                    page_str = f"{art_label} ({title.split('-', 1)[-1].strip()})" if "-" in title else f"{art_label} ({title})"
+                    page_str = (
+                        f"{art_label} ({title.split('-', 1)[-1].strip()})" if "-" in title else f"{art_label} ({title})"
+                    )
                 else:
                     page_str = str(art_label)
 
                 cleaned_quote = clean_regulatory_text(doc.page_content).strip()
-                context_snippets.append(f"[{idx+1}] {source_act} {page_str}: {cleaned_quote[:200]}")
-                
+                context_snippets.append(f"[{idx + 1}] {source_act} {page_str}: {cleaned_quote[:200]}")
+
                 # Directly extract citation from Document metadata
-                extracted_citations.append({
-                    "document": str(source_act),
-                    "page": str(page_str),
-                    "quoted_text": cleaned_quote
-                })
+                extracted_citations.append(
+                    {"document": str(source_act), "page": str(page_str), "quoted_text": cleaned_quote}
+                )
 
             if retrieved_docs:
                 top_doc = retrieved_docs[0]
@@ -212,7 +221,9 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
     except Exception as e:
         print(f"[Transaction Gatekeeper Warning] FAISS retrieval notice: {e}")
 
-    joined_context = "\n".join(context_snippets) if context_snippets else "EU Regulatory Framework (AMLD6, TFR, PSD2, MiCA)."
+    joined_context = (
+        "\n".join(context_snippets) if context_snippets else "EU Regulatory Framework (AMLD6, TFR, PSD2, MiCA)."
+    )
 
     # 3. Deterministic LLM Gatekeeper System Prompt
     system_prompt = (
@@ -241,11 +252,8 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
     try:
         llm = get_fast_transaction_llm()
         structured_llm = llm.with_structured_output(TransactionEvaluationResult)
-        
-        parsed_result = structured_llm.invoke([
-            ("system", system_prompt),
-            ("human", human_content)
-        ])
+
+        parsed_result = structured_llm.invoke([("system", system_prompt), ("human", human_content)])
 
         if isinstance(parsed_result, TransactionEvaluationResult):
             result = parsed_result
@@ -265,7 +273,7 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
                 is_compliant=False,
                 primary_violations=["Missing Mandatory Strong Customer Authentication (PSD2 Art. 97)"],
                 applicable_regulations=["PSD2 Directive (EU) 2015/2366 Article 97"],
-                audit_rationale=f"Transfer of {amount} {currency} blocked due to unauthenticated payment initiation exceeding the €30 exemption threshold."
+                audit_rationale=f"Transfer of {amount} {currency} blocked due to unauthenticated payment initiation exceeding the €30 exemption threshold.",
             )
         elif is_high_risk_country and amount >= 10000 and kyc_level != "enhanced":
             result = TransactionEvaluationResult(
@@ -275,7 +283,7 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
                 is_compliant=False,
                 primary_violations=["Missing Enhanced Due Diligence (EDD) for High-Risk Jurisdiction"],
                 applicable_regulations=["AMLD6 Directive (EU) 2018/1673"],
-                audit_rationale=f"Cross-border transfer of {amount} {currency} to high-risk jurisdiction flagged for mandatory EDD verification."
+                audit_rationale=f"Cross-border transfer of {amount} {currency} to high-risk jurisdiction flagged for mandatory EDD verification.",
             )
         else:
             result = TransactionEvaluationResult(
@@ -285,7 +293,7 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
                 is_compliant=True,
                 primary_violations=[],
                 applicable_regulations=["AMLD5 Directive (EU) 2018/843", "PSD2 Directive (EU) 2015/2366"],
-                audit_rationale=f"Transfer of {amount} {currency} via {payment_method} is fully compliant with regional KYC and PSD2 SCA safeguards."
+                audit_rationale=f"Transfer of {amount} {currency} via {payment_method} is fully compliant with regional KYC and PSD2 SCA safeguards.",
             )
 
     # 4. Strict Routing Invariant Alignment
@@ -307,7 +315,7 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
         "applicable_regulations": result.applicable_regulations,
         "audit_rationale": result.audit_rationale,
         "scrubbed_payload": scrubbed,
-        "timestamp": timestamp
+        "timestamp": timestamp,
     }
     canonical_json = json.dumps(hash_payload, sort_keys=True, separators=(",", ":"))
     sha256_audit_hash = hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
@@ -324,8 +332,12 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
     elif result.verdict in ["FLAGGED"]:
         result.rule_triggered = result.rule_triggered or "Threshold Reporting & Enhanced Due Diligence Required"
     else:
-        result.rule_triggered = result.rule_triggered or (result.primary_violations[0] if result.primary_violations else "Statutory Prohibition Policy Triggered")
+        result.rule_triggered = result.rule_triggered or (
+            result.primary_violations[0] if result.primary_violations else "Statutory Prohibition Policy Triggered"
+        )
 
-    result.legal_basis = result.legal_basis or (", ".join(result.applicable_regulations) if result.applicable_regulations else top_legal_basis)
+    result.legal_basis = result.legal_basis or (
+        ", ".join(result.applicable_regulations) if result.applicable_regulations else top_legal_basis
+    )
 
     return result

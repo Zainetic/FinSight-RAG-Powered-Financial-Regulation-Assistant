@@ -1,13 +1,13 @@
 import os
 import threading
-from typing import Optional
-from langchain_google_genai import ChatGoogleGenerativeAI
+
 from dotenv import load_dotenv
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 # Load environment variables (.env)
 load_dotenv()
 
-_llm_instance: Optional[ChatGoogleGenerativeAI] = None
+_llm_instance: ChatGoogleGenerativeAI | None = None
 _llm_lock = threading.Lock()
 
 
@@ -33,7 +33,7 @@ def get_gemini_llm() -> ChatGoogleGenerativeAI:
                     max_output_tokens=8192,
                     # --- Retry logic for rate limits & transient connection failures ---
                     max_retries=3,
-                    request_timeout=60.0
+                    request_timeout=60.0,
                 )
     return _llm_instance
 

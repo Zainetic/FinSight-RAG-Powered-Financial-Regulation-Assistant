@@ -17,15 +17,9 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
-from src.core.auth import (
-    hash_password,
-    verify_password,
-    create_access_token,
-    decode_access_token,
-    UserRole
-)
-from src.core.ledger import compute_canonical_hash, GENESIS_HASH
 from src.api.main import app
+from src.core.auth import UserRole, create_access_token, decode_access_token, hash_password, verify_password
+from src.core.ledger import GENESIS_HASH, compute_canonical_hash
 
 
 def test_password_hashing():
@@ -34,7 +28,9 @@ def test_password_hashing():
     hashed = hash_password(raw_pass)
     assert hashed != raw_pass, "Password was not hashed"
     assert verify_password(raw_pass, hashed) is True, "Password verification failed for valid password"
-    assert verify_password("WrongPassword123", hashed) is False, "Password verification returned True for invalid password"
+    assert verify_password("WrongPassword123", hashed) is False, (
+        "Password verification returned True for invalid password"
+    )
     print("  ✅ Password hashing and verification passed.")
 
 
@@ -48,7 +44,7 @@ def test_jwt_generation_and_decoding():
         "email": "admin@fintechcorp.eu",
         "org_id": org_id,
         "role": UserRole.MASTER_ADMIN.value,
-        "org_name": "FintechCorp EU"
+        "org_name": "FintechCorp EU",
     }
 
     token = create_access_token(token_data)
@@ -72,7 +68,7 @@ def test_deterministic_multi_tenant_ledger_hash():
     payload = {
         "risk_category": "High-Risk",
         "is_compliant": False,
-        "executive_summary_markdown": "Biometric credit profiling is prohibited."
+        "executive_summary_markdown": "Biometric credit profiling is prohibited.",
     }
 
     hash1 = compute_canonical_hash(
@@ -82,7 +78,7 @@ def test_deterministic_multi_tenant_ledger_hash():
         user_query="Biometric categorization in credit decisions",
         payload=payload,
         prev_hash=GENESIS_HASH,
-        org_id=org_id_1
+        org_id=org_id_1,
     )
 
     # Identical inputs must yield identical hash
@@ -93,7 +89,7 @@ def test_deterministic_multi_tenant_ledger_hash():
         user_query="Biometric categorization in credit decisions",
         payload=payload,
         prev_hash=GENESIS_HASH,
-        org_id=org_id_1
+        org_id=org_id_1,
     )
     assert hash1 == hash1_recomputed, "Deterministic hashing failed for identical inputs"
 
@@ -105,7 +101,7 @@ def test_deterministic_multi_tenant_ledger_hash():
         user_query="Biometric categorization in credit decisions",
         payload=payload,
         prev_hash=GENESIS_HASH,
-        org_id=org_id_2
+        org_id=org_id_2,
     )
     assert hash1 != hash2, "Hashes between different tenant org_ids should not collide"
     print(f"  ✅ Deterministic Hash 1: {hash1[:16]}... (Length: {len(hash1)})")
@@ -121,7 +117,7 @@ def test_fastapi_auth_and_rbac_endpoints():
     reg_payload = {
         "org_name": f"Nordic RegTech AB {unique_suffix}",
         "admin_email": f"admin_{unique_suffix}@nordicregtech.se",
-        "password": "SecureAdminPassword2026!"
+        "password": "SecureAdminPassword2026!",
     }
 
     reg_resp = client.post("/api/v1/auth/register-org", json=reg_payload)
@@ -134,10 +130,9 @@ def test_fastapi_auth_and_rbac_endpoints():
         print(f"  ✅ Genesis Block: {data.get('genesis_block', {}).get('tx_hash', 'Local Genesis')}")
 
         # 2. Test Login
-        login_resp = client.post("/api/v1/auth/login", json={
-            "email": reg_payload["admin_email"],
-            "password": reg_payload["password"]
-        })
+        login_resp = client.post(
+            "/api/v1/auth/login", json={"email": reg_payload["admin_email"], "password": reg_payload["password"]}
+        )
         assert login_resp.status_code == 200, f"Login failed: {login_resp.text}"
         login_data = login_resp.json()
         assert login_data["user"]["role"] == "MASTER_ADMIN"
@@ -152,37 +147,42 @@ def test_fastapi_auth_and_rbac_endpoints():
 
         # 4. Provision Developer and Manager accounts
         dev_email = f"dev_{unique_suffix}@nordicregtech.se"
-        dev_resp = client.post("/api/v1/auth/create-user", json={
-            "email": dev_email,
-            "password": "DevPassword2026!#",
-            "role": "DEVELOPER"
-        }, headers=auth_header)
+        dev_resp = client.post(
+            "/api/v1/auth/create-user",
+            json={"email": dev_email, "password": "DevPassword2026!#", "role": "DEVELOPER"},
+            headers=auth_header,
+        )
         assert dev_resp.status_code == 201, f"Create developer failed: {dev_resp.text}"
         print("  ✅ MASTER_ADMIN successfully created DEVELOPER account.")
 
         # Login as Developer
-        dev_login_resp = client.post("/api/v1/auth/login", json={
-            "email": dev_email,
-            "password": "DevPassword2026!#"
-        })
+        dev_login_resp = client.post("/api/v1/auth/login", json={"email": dev_email, "password": "DevPassword2026!#"})
         dev_token = dev_login_resp.json()["access_token"]
         dev_auth_header = {"Authorization": f"Bearer {dev_token}"}
 
         # 5. Verify RBAC: DEVELOPER cannot provision other users (Must return 403)
-        dev_create_attempt = client.post("/api/v1/auth/create-user", json={
-            "email": f"hacked_{unique_suffix}@nordicregtech.se",
-            "password": "Password123!",
-            "role": "DEVELOPER"
-        }, headers=dev_auth_header)
-        assert dev_create_attempt.status_code == 403, f"Expected 403 Forbidden for Developer user creation, got {dev_create_attempt.status_code}"
+        dev_create_attempt = client.post(
+            "/api/v1/auth/create-user",
+            json={"email": f"hacked_{unique_suffix}@nordicregtech.se", "password": "Password123!", "role": "DEVELOPER"},
+            headers=dev_auth_header,
+        )
+        assert dev_create_attempt.status_code == 403, (
+            f"Expected 403 Forbidden for Developer user creation, got {dev_create_attempt.status_code}"
+        )
         print("  ✅ RBAC Enforced: DEVELOPER is blocked from creating users (HTTP 403 Forbidden).")
 
         # 6. Verify RBAC: DEVELOPER cannot perform manual ledger overrides (Must return 403)
-        dev_override_attempt = client.post("/api/v1/override", json={
-            "audit_id": str(uuid.uuid4()),
-            "justification": "Developer trying to override high-risk compliance decision without approval"
-        }, headers=dev_auth_header)
-        assert dev_override_attempt.status_code == 403, f"Expected 403 Forbidden for Developer override, got {dev_override_attempt.status_code}"
+        dev_override_attempt = client.post(
+            "/api/v1/override",
+            json={
+                "audit_id": str(uuid.uuid4()),
+                "justification": "Developer trying to override high-risk compliance decision without approval",
+            },
+            headers=dev_auth_header,
+        )
+        assert dev_override_attempt.status_code == 403, (
+            f"Expected 403 Forbidden for Developer override, got {dev_override_attempt.status_code}"
+        )
         print("  ✅ RBAC Enforced: DEVELOPER is blocked from manual overrides (HTTP 403 Forbidden).")
 
         # 7. Unauthenticated request to /api/v1/ledger must return 401 Unauthorized
@@ -190,7 +190,6 @@ def test_fastapi_auth_and_rbac_endpoints():
         unauth_ledger = client.get("/api/v1/ledger")
         assert unauth_ledger.status_code == 401, f"Expected 401 Unauthorized, got {unauth_ledger.status_code}"
         print("  ✅ Endpoint Security: Unauthenticated request to /api/v1/ledger blocked (HTTP 401).")
-
 
         # 8. Authenticated request to /api/v1/ledger returns organization's ledger
         auth_ledger = client.get("/api/v1/ledger", headers=dev_auth_header)

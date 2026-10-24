@@ -12,12 +12,12 @@ Features:
 - Reproducible CLI report with precision percentages and failure forensics.
 """
 
-import os
-import sys
-import re
-import json
 import argparse
-from typing import Dict, List, Any, Optional, Tuple
+import json
+import os
+import re
+import sys
+from typing import Any
 
 if sys.platform == "win32":
     try:
@@ -34,6 +34,7 @@ STATUTES_DIR = os.path.join(BACKEND_DIR, "data", "raw_statutes")
 sys.path.insert(0, BACKEND_DIR)
 
 from dotenv import load_dotenv
+
 load_dotenv(os.path.join(ROOT_DIR, ".env"))
 load_dotenv(os.path.join(BACKEND_DIR, ".env"))
 
@@ -72,8 +73,8 @@ DOCUMENT_ALIASES = {
     "2024/1624": "AMLD6",  # Anti-Money Laundering Regulation
 }
 
-_raw_corpora_cache: Dict[str, str] = {}
-_normalized_corpora_cache: Dict[str, str] = {}
+_raw_corpora_cache: dict[str, str] = {}
+_normalized_corpora_cache: dict[str, str] = {}
 
 
 def normalize_legal_text(text: str) -> str:
@@ -90,7 +91,7 @@ def normalize_legal_text(text: str) -> str:
     return t.strip()
 
 
-def load_statute_corpus(act_key: str) -> Optional[str]:
+def load_statute_corpus(act_key: str) -> str | None:
     """Loads and caches the raw statute text from backend/data/raw_statutes/."""
     canonical_act = act_key.upper().strip()
     filename = STATUTE_FILES.get(canonical_act)
@@ -118,7 +119,7 @@ def load_statute_corpus(act_key: str) -> Optional[str]:
     return _raw_corpora_cache[filename]
 
 
-def verify_single_citation(citation: Dict[str, Any]) -> Dict[str, Any]:
+def verify_single_citation(citation: dict[str, Any]) -> dict[str, Any]:
     """
     Verifies a citation dictionary against the official statute corpus.
     Expected keys:
@@ -137,7 +138,7 @@ def verify_single_citation(citation: Dict[str, Any]) -> Dict[str, Any]:
             "status": "EMPTY_QUOTE",
             "is_verbatim": False,
             "character_length": 0,
-            "match_snippet": None
+            "match_snippet": None,
         }
 
     # Resolve corpus
@@ -182,7 +183,7 @@ def verify_single_citation(citation: Dict[str, Any]) -> Dict[str, Any]:
                 "status": "VERBATIM_CONFIRMED",
                 "is_verbatim": True,
                 "character_length": len(norm_quote),
-                "context_snippet": f"...{norm_corpus[snippet_start:snippet_end]}..."
+                "context_snippet": f"...{norm_corpus[snippet_start:snippet_end]}...",
             }
 
         # 2. Sub-chunk match (first 80 characters for truncated quotes)
@@ -196,7 +197,7 @@ def verify_single_citation(citation: Dict[str, Any]) -> Dict[str, Any]:
                 "status": "PARTIAL_MATCH",
                 "is_verbatim": False,
                 "character_length": len(norm_quote),
-                "context_snippet": f"Partial match found in {filename}."
+                "context_snippet": f"Partial match found in {filename}.",
             }
 
     return {
@@ -205,58 +206,58 @@ def verify_single_citation(citation: Dict[str, Any]) -> Dict[str, Any]:
         "status": "UNGROUNDED_OR_HALLUCINATED",
         "is_verbatim": False,
         "character_length": len(norm_quote),
-        "context_snippet": None
+        "context_snippet": None,
     }
 
 
-def run_self_test() -> List[Dict[str, Any]]:
+def run_self_test() -> list[dict[str, Any]]:
     """Runs a self-test with known statutory excerpts from all 8 frameworks."""
     fixtures = [
         {
             "document": "PSD2 Directive (EU) 2015/2366",
             "page": "Recital (7)",
-            "quoted_text": "In recent years, the security risks relating to electronic payments have increased. This is due to the growing technical complexity of electronic payments, the continuously growing volumes of electronic payments worldwide and emerging types of payment services."
+            "quoted_text": "In recent years, the security risks relating to electronic payments have increased. This is due to the growing technical complexity of electronic payments, the continuously growing volumes of electronic payments worldwide and emerging types of payment services.",
         },
         {
             "document": "GDPR Regulation (EU) 2016/679",
             "page": "Article 25",
-            "quoted_text": "Taking into account the state of the art, the cost of implementation and the nature, scope, context and purposes of processing"
+            "quoted_text": "Taking into account the state of the art, the cost of implementation and the nature, scope, context and purposes of processing",
         },
         {
             "document": "MiCA Regulation (EU) 2023/1114",
             "page": "Recital (2)",
-            "quoted_text": "Crypto-assets are one of the main applications of distributed ledger technology. Crypto-assets are digital representations of value or of rights that have the potential to bring significant benefits to market participants, including retail holders of crypto-assets."
+            "quoted_text": "Crypto-assets are one of the main applications of distributed ledger technology. Crypto-assets are digital representations of value or of rights that have the potential to bring significant benefits to market participants, including retail holders of crypto-assets.",
         },
         {
             "document": "DORA Regulation (EU) 2022/2554",
             "page": "Article 5",
-            "quoted_text": "Financial entities shall have in place an internal governance and control framework that ensures an effective and prudent management of ICT risk"
+            "quoted_text": "Financial entities shall have in place an internal governance and control framework that ensures an effective and prudent management of ICT risk",
         },
         {
             "document": "EU AI Act Regulation (EU) 2024/1689",
             "page": "Article 14",
-            "quoted_text": "High-risk AI systems shall be designed and developed in such a way, including with appropriate human-machine interface tools, that they can be effectively overseen by natural persons"
+            "quoted_text": "High-risk AI systems shall be designed and developed in such a way, including with appropriate human-machine interface tools, that they can be effectively overseen by natural persons",
         },
         {
             "document": "TFR Regulation (EU) 2023/1113",
             "page": "Article 14",
-            "quoted_text": "The crypto-asset service provider of the originator shall ensure that transfers of crypto-assets are accompanied by the following information on the originator"
+            "quoted_text": "The crypto-asset service provider of the originator shall ensure that transfers of crypto-assets are accompanied by the following information on the originator",
         },
         {
             "document": "AMLD5 Directive (EU) 2018/843",
             "page": "Article 30",
-            "quoted_text": "Member States shall ensure that corporate and other legal entities incorporated within their territory are required to obtain and hold adequate, accurate and current information on their beneficial ownership"
+            "quoted_text": "Member States shall ensure that corporate and other legal entities incorporated within their territory are required to obtain and hold adequate, accurate and current information on their beneficial ownership",
         },
         {
             "document": "AMLD6 Directive (EU) 2018/1673",
             "page": "Recital (1)",
-            "quoted_text": "Money laundering and the related financing of terrorism and organised crime remain significant problems at Union level, thus damaging the integrity, stability and reputation of the financial sector and threatening the internal market and the internal security of the Union."
+            "quoted_text": "Money laundering and the related financing of terrorism and organised crime remain significant problems at Union level, thus damaging the integrity, stability and reputation of the financial sector and threatening the internal market and the internal security of the Union.",
         },
         {
             "document": "Synthetic Hallucination Test",
             "page": "Article 999",
-            "quoted_text": "Financial algorithms must always use quantum computers to verify blockchain transactions according to interplanetary standards."
-        }
+            "quoted_text": "Financial algorithms must always use quantum computers to verify blockchain transactions according to interplanetary standards.",
+        },
     ]
 
     results = []
@@ -266,7 +267,7 @@ def run_self_test() -> List[Dict[str, Any]]:
     return results
 
 
-def run_database_audit() -> List[Dict[str, Any]]:
+def run_database_audit() -> list[dict[str, Any]]:
     """Fetches real citations recorded in the PostgreSQL audit ledger and verifies them."""
     from src.core.database import get_db_connection, init_db
 
@@ -303,7 +304,7 @@ def run_database_audit() -> List[Dict[str, Any]]:
     return results
 
 
-def print_report_table(results: List[Dict[str, Any]], title: str):
+def print_report_table(results: list[dict[str, Any]], title: str):
     """Prints a structured Markdown summary table of verification results."""
     total = len(results)
     verbatim_count = sum(1 for r in results if r.get("status") == "VERBATIM_CONFIRMED")
@@ -345,7 +346,10 @@ if __name__ == "__main__":
         if db_results:
             print_report_table(db_results, "PostgreSQL Ledger Records")
         else:
-            print("No citations found in recent database ledger blocks. Run transactions or evaluate to populate.", flush=True)
+            print(
+                "No citations found in recent database ledger blocks. Run transactions or evaluate to populate.",
+                flush=True,
+            )
     else:
         print("Running statutory citation self-test across all 8 European frameworks...", flush=True)
         self_results = run_self_test()

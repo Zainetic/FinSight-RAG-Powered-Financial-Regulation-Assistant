@@ -1,24 +1,25 @@
 import os
-import sys
-import uuid
 import socket
+import sys
 import threading
+import uuid
+from collections.abc import AsyncGenerator, Generator
 from contextlib import contextmanager
-from datetime import datetime, timezone
-from typing import Optional, Generator, AsyncGenerator, Dict, Any, List
+from datetime import UTC, datetime
+from typing import Any
+
 import psycopg2
+from dotenv import load_dotenv
 from psycopg2 import pool
 from psycopg2.extras import Json, RealDictCursor
-from dotenv import load_dotenv
-
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 # Load database credentials from the .env file
 load_dotenv()
 
 _db_initialized = False
 _db_lock = threading.Lock()
-_pool_instance: Optional[pool.ThreadedConnectionPool] = None
+_pool_instance: pool.ThreadedConnectionPool | None = None
 _pool_lock = threading.Lock()
 _db_unreachable = False
 
@@ -26,8 +27,6 @@ _db_unreachable = False
 _async_engine = None
 _async_session_factory = None
 _async_lock = threading.RLock()
-
-
 
 
 def _get_resolved_db_url() -> str:
@@ -51,7 +50,7 @@ def _get_resolved_db_url() -> str:
     return db_url
 
 
-def get_connection_pool() -> Optional[pool.ThreadedConnectionPool]:
+def get_connection_pool() -> pool.ThreadedConnectionPool | None:
     """
     Returns a thread-safe singleton instance of ThreadedConnectionPool.
     Reuses existing connections to avoid connection churn in multi-user workloads.
@@ -65,12 +64,7 @@ def get_connection_pool() -> Optional[pool.ThreadedConnectionPool]:
             if _pool_instance is None:
                 try:
                     db_url = _get_resolved_db_url()
-                    _pool_instance = pool.ThreadedConnectionPool(
-                        minconn=1,
-                        maxconn=20,
-                        dsn=db_url,
-                        connect_timeout=3
-                    )
+                    _pool_instance = pool.ThreadedConnectionPool(minconn=1, maxconn=20, dsn=db_url, connect_timeout=3)
                 except Exception as e:
                     sys.stderr.write(f"[Database Warning] Connection pool initialization failed: {e}\n")
                     _db_unreachable = True
@@ -132,6 +126,7 @@ def get_db_connection() -> Generator[psycopg2.extensions.connection, None, None]
 # SQLAlchemy Async Engine & Session Dependency (FastAPI Depends(get_db))
 # =====================================================================
 
+
 def get_async_engine():
     """Returns a thread-safe singleton async SQLAlchemy engine."""
     global _async_engine
@@ -144,11 +139,7 @@ def get_async_engine():
                 elif db_url.startswith("postgres://"):
                     db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
                 _async_engine = create_async_engine(
-                    db_url,
-                    echo=False,
-                    pool_pre_ping=True,
-                    pool_size=10,
-                    max_overflow=20
+                    db_url, echo=False, pool_pre_ping=True, pool_size=10, max_overflow=20
                 )
     return _async_engine
 
@@ -160,11 +151,7 @@ def get_async_session_factory():
         with _async_lock:
             if _async_session_factory is None:
                 engine = get_async_engine()
-                _async_session_factory = async_sessionmaker(
-                    engine,
-                    class_=AsyncSession,
-                    expire_on_commit=False
-                )
+                _async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     return _async_session_factory
 
 
@@ -185,7 +172,6 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 def init_db() -> bool:
-
     """
     Initializes the PostgreSQL database with multi-tenant B2B schema:
     1. organizations table (id UUID, name String, created_at TIMESTAMPTZ)
@@ -293,14 +279,30 @@ def init_db() -> bool:
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_organizations_name ON organizations (name);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_org_id ON users (org_id);")
-                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_compliance_ledger_org_id ON compliance_ledger (org_id);")
-                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_compliance_ledger_timestamp ON compliance_ledger (timestamp);")
-                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_compliance_ledger_prev_hash ON compliance_ledger (prev_hash);")
-                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_compliance_ledger_tx_hash ON compliance_ledger (tx_hash);")
-                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_compliance_ledger_payload_gin ON compliance_ledger USING gin (payload);")
-                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_transaction_ledger_tx_id ON transaction_ledger (transaction_id);")
-                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_transaction_ledger_hash ON transaction_ledger (sha256_hash);")
-                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_transaction_ledger_timestamp ON transaction_ledger (timestamp);")
+                    cursor.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_compliance_ledger_org_id ON compliance_ledger (org_id);"
+                    )
+                    cursor.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_compliance_ledger_timestamp ON compliance_ledger (timestamp);"
+                    )
+                    cursor.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_compliance_ledger_prev_hash ON compliance_ledger (prev_hash);"
+                    )
+                    cursor.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_compliance_ledger_tx_hash ON compliance_ledger (tx_hash);"
+                    )
+                    cursor.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_compliance_ledger_payload_gin ON compliance_ledger USING gin (payload);"
+                    )
+                    cursor.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_transaction_ledger_tx_id ON transaction_ledger (transaction_id);"
+                    )
+                    cursor.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_transaction_ledger_hash ON transaction_ledger (sha256_hash);"
+                    )
+                    cursor.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_transaction_ledger_timestamp ON transaction_ledger (timestamp);"
+                    )
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_prompts_org_id ON prompts (org_id);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_prompts_created_at ON prompts (created_at);")
 
@@ -309,10 +311,10 @@ def init_db() -> bool:
                     try:
                         print("✅ PostgreSQL Multi-Tenant Schema, Organizations, Users, & Ledger indexes initialized.")
                     except UnicodeEncodeError:
-                        print("[OK] PostgreSQL Multi-Tenant Schema, Organizations, Users, & Ledger indexes initialized.")
+                        print(
+                            "[OK] PostgreSQL Multi-Tenant Schema, Organizations, Users, & Ledger indexes initialized."
+                        )
                     return True
-
-
 
         except Exception as e:
             sys.stderr.write(f"[Database Error] DB initialization failed: {e}\n")
@@ -323,22 +325,26 @@ def init_db() -> bool:
 # Multi-Tenant & User Management Helpers
 # =====================================================================
 
-def create_organization(name: str, org_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+
+def create_organization(name: str, org_id: str | None = None) -> dict[str, Any] | None:
     """Creates a new organization record."""
     if not _db_initialized:
         init_db()
 
     new_id = org_id if org_id else str(uuid.uuid4())
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
 
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO organizations (id, name, created_at)
                     VALUES (%s, %s, %s)
                     RETURNING id, name, created_at;
-                """, (new_id, name.strip(), now_utc))
+                """,
+                    (new_id, name.strip(), now_utc),
+                )
                 row = cursor.fetchone()
                 conn.commit()
                 if row:
@@ -350,7 +356,7 @@ def create_organization(name: str, org_id: Optional[str] = None) -> Optional[Dic
         return None
 
 
-def get_organization_by_id(org_id: str) -> Optional[Dict[str, Any]]:
+def get_organization_by_id(org_id: str) -> dict[str, Any] | None:
     """Fetches an organization by its UUID."""
     if not _db_initialized:
         init_db()
@@ -358,11 +364,14 @@ def get_organization_by_id(org_id: str) -> Optional[Dict[str, Any]]:
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT id, name, created_at
                     FROM organizations
                     WHERE id = %s;
-                """, (str(org_id),))
+                """,
+                    (str(org_id),),
+                )
                 row = cursor.fetchone()
                 if row:
                     row["id"] = str(row["id"])
@@ -375,34 +384,26 @@ def get_organization_by_id(org_id: str) -> Optional[Dict[str, Any]]:
 
 
 def create_user(
-    org_id: str,
-    email: str,
-    hashed_password: str,
-    role: str,
-    user_id: Optional[str] = None
-) -> Optional[Dict[str, Any]]:
+    org_id: str, email: str, hashed_password: str, role: str, user_id: str | None = None
+) -> dict[str, Any] | None:
     """Creates a new user record tied to an organization."""
     if not _db_initialized:
         init_db()
 
     new_id = user_id if user_id else str(uuid.uuid4())
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
 
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO users (id, org_id, email, hashed_password, role, created_at)
                     VALUES (%s, %s, %s, %s, %s, %s)
                     RETURNING id, org_id, email, role, created_at;
-                """, (
-                    new_id,
-                    str(org_id),
-                    email.strip().lower(),
-                    hashed_password,
-                    role.upper(),
-                    now_utc
-                ))
+                """,
+                    (new_id, str(org_id), email.strip().lower(), hashed_password, role.upper(), now_utc),
+                )
                 row = cursor.fetchone()
                 conn.commit()
                 if row:
@@ -415,7 +416,7 @@ def create_user(
         return None
 
 
-def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+def get_user_by_email(email: str) -> dict[str, Any] | None:
     """Fetches a user by email along with their organization name."""
     if not _db_initialized:
         init_db()
@@ -423,13 +424,16 @@ def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT u.id, u.org_id, u.email, u.hashed_password, u.role, u.created_at,
                            o.name AS org_name
                     FROM users u
                     JOIN organizations o ON u.org_id = o.id
                     WHERE u.email = %s;
-                """, (email.strip().lower(),))
+                """,
+                    (email.strip().lower(),),
+                )
                 row = cursor.fetchone()
                 if row:
                     row["id"] = str(row["id"])
@@ -442,7 +446,7 @@ def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
+def get_user_by_id(user_id: str) -> dict[str, Any] | None:
     """Fetches a user by UUID along with their organization name."""
     if not _db_initialized:
         init_db()
@@ -450,13 +454,16 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT u.id, u.org_id, u.email, u.role, u.created_at,
                            o.name AS org_name
                     FROM users u
                     JOIN organizations o ON u.org_id = o.id
                     WHERE u.id = %s;
-                """, (str(user_id),))
+                """,
+                    (str(user_id),),
+                )
                 row = cursor.fetchone()
                 if row:
                     row["id"] = str(row["id"])
@@ -469,7 +476,7 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def list_users_by_org(org_id: str) -> List[Dict[str, Any]]:
+def list_users_by_org(org_id: str) -> list[dict[str, Any]]:
     """Lists all users belonging to a specific organization."""
     if not _db_initialized:
         init_db()
@@ -477,12 +484,15 @@ def list_users_by_org(org_id: str) -> List[Dict[str, Any]]:
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT id, org_id, email, role, created_at
                     FROM users
                     WHERE org_id = %s
                     ORDER BY created_at ASC;
-                """, (str(org_id),))
+                """,
+                    (str(org_id),),
+                )
                 rows = cursor.fetchall()
                 results = []
                 for row in rows:
@@ -496,11 +506,7 @@ def list_users_by_org(org_id: str) -> List[Dict[str, Any]]:
         return []
 
 
-def save_compliance_record(
-    user_query: str,
-    result_dict: dict,
-    org_id: Optional[str] = None
-) -> bool:
+def save_compliance_record(user_query: str, result_dict: dict, org_id: str | None = None) -> bool:
     """
     Extracts indexed fields and writes the full payload to PostgreSQL JSONB storage.
     Returns True if successfully persisted, False otherwise.
@@ -518,18 +524,21 @@ def save_compliance_record(
                 risk_category = result_dict.get("risk_category", "Unknown")
                 is_compliant = bool(result_dict.get("is_compliant", False))
 
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO compliance_logs 
                     (org_id, timestamp, user_query, risk_category, is_compliant, full_json_payload)
                     VALUES (%s, %s, %s, %s, %s, %s)
-                """, (
-                    str(org_id) if org_id else None,
-                    timestamp,
-                    user_query,
-                    risk_category,
-                    is_compliant,
-                    Json(result_dict)
-                ))
+                """,
+                    (
+                        str(org_id) if org_id else None,
+                        timestamp,
+                        user_query,
+                        risk_category,
+                        is_compliant,
+                        Json(result_dict),
+                    ),
+                )
 
                 conn.commit()
                 print("Payload successfully routed to PostgreSQL JSONB storage.")

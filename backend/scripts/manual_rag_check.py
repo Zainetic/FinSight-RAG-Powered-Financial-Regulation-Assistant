@@ -1,6 +1,6 @@
 import os
 import sys
-import json
+
 from dotenv import load_dotenv
 
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
@@ -15,7 +15,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 load_dotenv()
 
 from src.core.rag import query_compliance_engine
-
 
 
 def run_test():
@@ -43,7 +42,7 @@ def run_test():
         print(f"  • Risk Category:       {result['risk_category']}")
         print(f"  • System Compliant:    {result['is_compliant']}")
         print(f"  • Citations Extracted: {len(result['citations'])} source reference(s)")
-        for idx, citation in enumerate(result['citations'], start=1):
+        for idx, citation in enumerate(result["citations"], start=1):
             print(f"    [{idx}] {citation['document']} (Page {citation['page']})")
 
         print("-" * 60)
@@ -64,4 +63,4 @@ def run_test():
 
 
 if __name__ == "__main__":
-    run_test()
+    run_test()

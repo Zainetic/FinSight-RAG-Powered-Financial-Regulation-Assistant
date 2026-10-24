@@ -5,7 +5,12 @@ serialize correctly under database locking and do NOT fork the hash chain.
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from src.core.ledger import create_genesis_block, append_compliance_record, verify_ledger_chain
+
+from src.core.ledger import (
+    append_compliance_record,
+    create_genesis_block,
+    verify_ledger_chain,
+)
 
 
 def test_concurrent_inserts_do_not_fork_chain(test_organization):
@@ -20,9 +25,7 @@ def test_concurrent_inserts_do_not_fork_chain(test_organization):
 
     def insert_record(idx: int):
         return append_compliance_record(
-            user_query=f"Concurrent audit turn {idx}",
-            payload={"turn": idx, "is_compliant": True},
-            org_id=org_id
+            user_query=f"Concurrent audit turn {idx}", payload={"turn": idx, "is_compliant": True}, org_id=org_id
         )
 
     # 2. Dispatch parallel inserts across thread pool
