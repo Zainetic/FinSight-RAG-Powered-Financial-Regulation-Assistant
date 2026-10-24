@@ -306,7 +306,10 @@ def init_db() -> bool:
 
                     conn.commit()
                     _db_initialized = True
-                    print("✅ PostgreSQL Multi-Tenant Schema, Organizations, Users, & Ledger indexes initialized.")
+                    try:
+                        print("✅ PostgreSQL Multi-Tenant Schema, Organizations, Users, & Ledger indexes initialized.")
+                    except UnicodeEncodeError:
+                        print("[OK] PostgreSQL Multi-Tenant Schema, Organizations, Users, & Ledger indexes initialized.")
                     return True
 
 

@@ -49,14 +49,31 @@ def compute_canonical_hash(
     Computes a deterministic SHA-256 hash of the record's canonical data.
     Keys are sorted and JSON is formatted deterministically without arbitrary whitespace.
     Includes org_id to ensure tenant cryptographic uniqueness.
+    Normalizes datetime to UTC ISO-8601 to ensure deterministic verification regardless of database session timezone.
     """
+    if isinstance(timestamp_utc, str):
+        try:
+            dt = datetime.fromisoformat(timestamp_utc)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            norm_timestamp = dt.astimezone(timezone.utc).isoformat()
+        except Exception:
+            norm_timestamp = timestamp_utc
+    elif hasattr(timestamp_utc, "astimezone"):
+        dt = timestamp_utc
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        norm_timestamp = dt.astimezone(timezone.utc).isoformat()
+    else:
+        norm_timestamp = str(timestamp_utc)
+
     canonical_dict = {
         "audit_id": str(audit_id),
         "model_provenance": str(model_provenance),
         "org_id": str(org_id) if org_id else "",
         "payload": payload,
         "prev_hash": str(prev_hash),
-        "timestamp": timestamp_utc.isoformat(),
+        "timestamp": norm_timestamp,
         "user_query": str(user_query)
     }
 
@@ -95,10 +112,9 @@ def append_compliance_record(
         if not init_ledger_table():
             return None
 
-    audit_id = uuid.uuid4()
-    timestamp_utc = datetime.now(timezone.utc)
-
     with _ledger_lock:
+        audit_id = uuid.uuid4()
+        timestamp_utc = datetime.now(timezone.utc)
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cursor:
@@ -224,10 +240,9 @@ def override_ledger_record(
         if not init_ledger_table():
             return None
 
-    new_audit_id = uuid.uuid4()
-    timestamp_utc = datetime.now(timezone.utc)
-
     with _ledger_lock:
+        new_audit_id = uuid.uuid4()
+        timestamp_utc = datetime.now(timezone.utc)
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cursor:
