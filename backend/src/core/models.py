@@ -4,9 +4,10 @@ Defines ORM mappings for Organizations, Users, Compliance Ledgers, Transaction G
 """
 
 import uuid
-from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, Text, Boolean, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from datetime import UTC, datetime
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -17,7 +18,7 @@ class Organization(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False, index=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
     users = relationship("User", back_populates="organization", cascade="all, delete-orphan")
 
@@ -30,7 +31,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False)  # DEVELOPER, MANAGER, MASTER_ADMIN
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
     organization = relationship("Organization", back_populates="users")
 
@@ -53,6 +54,7 @@ class TransactionLedger(Base):
     SQLAlchemy Model for Machine-to-Machine Financial Transaction Compliance & Gatekeeper Audit.
     Persists zero-trust sanitized payloads, rule outcomes, risk scores, and SHA-256 audit hashes.
     """
+
     __tablename__ = "transaction_ledger"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -63,7 +65,7 @@ class TransactionLedger(Base):
     rule_triggered = Column(Text, nullable=True)
     legal_basis = Column(Text, nullable=True)
     sha256_hash = Column(String(64), nullable=False, index=True)
-    timestamp = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    timestamp = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC), index=True)
 
     def to_dict(self):
         return {
@@ -75,7 +77,7 @@ class TransactionLedger(Base):
             "rule_triggered": self.rule_triggered,
             "legal_basis": self.legal_basis,
             "sha256_hash": self.sha256_hash,
-            "timestamp": self.timestamp.isoformat() if self.timestamp else None
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
         }
 
 
@@ -83,13 +85,14 @@ class Prompt(Base):
     """
     SQLAlchemy Model for system prompts, test scenarios, and architectural template queries.
     """
+
     __tablename__ = "prompts"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
     title = Column(String(255), nullable=True)
     content = Column(Text, nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
     def to_dict(self):
         return {
@@ -97,5 +100,5 @@ class Prompt(Base):
             "org_id": str(self.org_id) if self.org_id else None,
             "title": self.title,
             "content": self.content,
-            "created_at": self.created_at.isoformat() if self.created_at else None
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }

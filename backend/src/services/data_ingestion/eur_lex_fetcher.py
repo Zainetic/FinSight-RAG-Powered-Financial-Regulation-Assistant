@@ -14,12 +14,12 @@ European financial, banking, and AI regulatory frameworks:
 - GDPR (Regulation (EU) 2016/679 - General Data Protection Regulation)
 """
 
-import os
-import re
-import sys
 import html
+import os
+import sys
 from html.parser import HTMLParser
-from typing import Dict, Any, Optional
+from typing import Any
+
 import requests
 
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
@@ -29,9 +29,9 @@ if sys.stderr and hasattr(sys.stderr, "reconfigure"):
 
 # Directory Resolution
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))  # src/services/data_ingestion
-SERVICES_DIR = os.path.dirname(SCRIPT_DIR)               # src/services
-SRC_DIR = os.path.dirname(SERVICES_DIR)                  # src
-BACKEND_DIR = os.path.dirname(SRC_DIR)                   # backend
+SERVICES_DIR = os.path.dirname(SCRIPT_DIR)  # src/services
+SRC_DIR = os.path.dirname(SERVICES_DIR)  # src
+BACKEND_DIR = os.path.dirname(SRC_DIR)  # backend
 RAW_STATUTES_DIR = os.path.join(BACKEND_DIR, "data", "raw_statutes")
 
 
@@ -39,15 +39,15 @@ RAW_STATUTES_DIR = os.path.join(BACKEND_DIR, "data", "raw_statutes")
 # Configuration & Regulatory Targets
 # =====================================================================
 
-REGULATIONS: Dict[str, str] = {
+REGULATIONS: dict[str, str] = {
     "AMLD6": "32018L1673",
     "AMLD5": "32018L0843",
     "PSD2": "32015L2366",
     "MiCA": "32023R1114",
-    "TFR": "32023R1113",      # Transfer of Funds (Crypto Travel Rule)
-    "DORA": "32022R2554",     # Digital Operational Resilience Act
-    "EU_AI_ACT": "32024R1689", # European Artificial Intelligence Act
-    "GDPR": "32016R0679"      # General Data Protection Regulation
+    "TFR": "32023R1113",  # Transfer of Funds (Crypto Travel Rule)
+    "DORA": "32022R2554",  # Digital Operational Resilience Act
+    "EU_AI_ACT": "32024R1689",  # European Artificial Intelligence Act
+    "GDPR": "32016R0679",  # General Data Protection Regulation
 }
 
 EUR_LEX_SPARQL_ENDPOINT = "http://publications.europa.eu/webapi/rdf/sparql"
@@ -62,6 +62,7 @@ DEFAULT_HEADERS = {
 # =====================================================================
 # HTML / XHTML Text Stripping & Normalization Utility
 # =====================================================================
+
 
 class HTMLTextExtractor(HTMLParser):
     """HTML / XHTML Parser that extracts legible statutory content, stripping markup and tags."""
@@ -103,7 +104,8 @@ def clean_html_content(raw_html: str) -> str:
 # SPARQL Query Execution
 # =====================================================================
 
-def query_eur_lex_sparql(celex: str, endpoint: str = EUR_LEX_SPARQL_ENDPOINT) -> Dict[str, Any]:
+
+def query_eur_lex_sparql(celex: str, endpoint: str = EUR_LEX_SPARQL_ENDPOINT) -> dict[str, Any]:
     """
     Executes a semantic SPARQL query against the EU Publications Office endpoint
     to extract legal act metadata, official title, date, and document manifestation URIs.
@@ -136,20 +138,12 @@ def query_eur_lex_sparql(celex: str, endpoint: str = EUR_LEX_SPARQL_ENDPOINT) ->
     }}
     """
 
-    params = {
-        "query": sparql_query.strip(),
-        "format": "application/sparql-results+json"
-    }
+    params = {"query": sparql_query.strip(), "format": "application/sparql-results+json"}
 
     portal_url = EUR_LEX_PORTAL_URL_TEMPLATE.format(celex=celex)
 
     try:
-        response = requests.get(
-            endpoint,
-            params=params,
-            headers=DEFAULT_HEADERS,
-            timeout=25
-        )
+        response = requests.get(endpoint, params=params, headers=DEFAULT_HEADERS, timeout=25)
         response.raise_for_status()
         data = response.json()
 
@@ -181,7 +175,7 @@ def query_eur_lex_sparql(celex: str, endpoint: str = EUR_LEX_SPARQL_ENDPOINT) ->
             "work_uri": work_uri,
             "direct_doc_url": direct_doc_url,
             "portal_url": portal_url,
-            "source_endpoint": endpoint
+            "source_endpoint": endpoint,
         }
 
     except Exception as e:
@@ -193,13 +187,14 @@ def query_eur_lex_sparql(celex: str, endpoint: str = EUR_LEX_SPARQL_ENDPOINT) ->
             "work_uri": "",
             "direct_doc_url": portal_url,
             "portal_url": portal_url,
-            "source_endpoint": endpoint
+            "source_endpoint": endpoint,
         }
 
 
 # =====================================================================
 # Document Content Ingestion
 # =====================================================================
+
 
 def download_regulation_text(document_url: str) -> str:
     """
@@ -213,7 +208,7 @@ def download_regulation_text(document_url: str) -> str:
     """
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 FinSight/2.0",
-        "Accept": "application/xhtml+xml, text/html, application/xml;q=0.9, */*;q=0.8"
+        "Accept": "application/xhtml+xml, text/html, application/xml;q=0.9, */*;q=0.8",
     }
 
     response = requests.get(document_url, headers=headers, timeout=35)
@@ -221,7 +216,7 @@ def download_regulation_text(document_url: str) -> str:
     return response.text
 
 
-def fetch_regulation(name: str, celex_id: str, output_path: str) -> Dict[str, Any]:
+def fetch_regulation(name: str, celex_id: str, output_path: str) -> dict[str, Any]:
     """
     Fetches, cleans, and saves a single regulation statutory text to the designated output path.
     """
@@ -245,7 +240,7 @@ def fetch_regulation(name: str, celex_id: str, output_path: str) -> Dict[str, An
     # Write clean statutory file
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write(f"=== FINSIGHT REGTECH: REGULATION INGESTION AUDIT ===\n")
+        f.write("=== FINSIGHT REGTECH: REGULATION INGESTION AUDIT ===\n")
         f.write(f"REGULATION_NAME: {name}\n")
         f.write(f"CELEX ID:        {meta['celex']}\n")
         f.write(f"OFFICIAL TITLE:  {meta['title']}\n")
@@ -261,7 +256,7 @@ def fetch_regulation(name: str, celex_id: str, output_path: str) -> Dict[str, An
         "celex": celex_id,
         "metadata": meta,
         "cleaned_size_chars": len(cleaned_text),
-        "output_path": output_path
+        "output_path": output_path,
     }
 
 
@@ -269,7 +264,8 @@ def fetch_regulation(name: str, celex_id: str, output_path: str) -> Dict[str, An
 # Multi-Regulation Execution Pipeline
 # =====================================================================
 
-def fetch_all_regulations(output_dir: str = RAW_STATUTES_DIR) -> Dict[str, Any]:
+
+def fetch_all_regulations(output_dir: str = RAW_STATUTES_DIR) -> dict[str, Any]:
     """
     Iterates through the entire catalog of European Fintech and AI regulations,
     downloads and cleans each statutory text, and saves it to a unique file in 'backend/data/raw_statutes'
@@ -285,7 +281,7 @@ def fetch_all_regulations(output_dir: str = RAW_STATUTES_DIR) -> Dict[str, Any]:
     print(f"Output Directory:    {output_dir}")
     print("=" * 76)
 
-    results: Dict[str, Any] = {"successful": [], "failed": []}
+    results: dict[str, Any] = {"successful": [], "failed": []}
 
     for name, celex in REGULATIONS.items():
         filename = f"{name.lower()}_raw.txt"
@@ -309,7 +305,7 @@ def fetch_all_regulations(output_dir: str = RAW_STATUTES_DIR) -> Dict[str, Any]:
 
 
 # Backward compatibility alias for single AMLD6 execution
-def fetch_amld6_regulation(output_file: str = "amld6_raw.txt") -> Dict[str, Any]:
+def fetch_amld6_regulation(output_file: str = "amld6_raw.txt") -> dict[str, Any]:
     target_path = os.path.join(RAW_STATUTES_DIR, output_file) if not os.path.isabs(output_file) else output_file
     return fetch_regulation("AMLD6", REGULATIONS["AMLD6"], target_path)
 

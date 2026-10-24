@@ -1,0 +1,15 @@
+line-length = 120
+target-version = "py313"
+
+[lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E501",  # Line length handled gracefully
+    "E402",  # Module level import after path/env setup
+    "F841",  # Local variable assigned but unused (common in tests)
+    "W291",  # Trailing whitespace in multiline SQL templates
+    "W293",  # Whitespace on blank lines
+]
+
+[lint.isort]
+known-first-party = ["src"]

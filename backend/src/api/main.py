@@ -1,18 +1,18 @@
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from src.core.limiter import limiter
+from src.api.auth import router as auth_router
+from src.api.prompts import router as prompts_router
+from src.api.routes import router as compliance_router
+from src.api.transactions import router as transactions_router
 from src.core.database import init_db
 from src.core.ledger import init_ledger_table
-from src.api.routes import router as compliance_router
-from src.api.auth import router as auth_router
-from src.api.transactions import router as transactions_router
-from src.api.prompts import router as prompts_router
-
+from src.core.limiter import limiter
 
 
 @asynccontextmanager
@@ -30,12 +30,13 @@ app = FastAPI(
     title="FinSight RegTech API",
     description="Enterprise Multi-Tenant Regulatory Compliance Gatekeeper with RBAC and SHA-256 Ledger",
     version="2.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # 1. Register SlowAPI Rate Limiter State & Exception Handler (Rules 11 & 12)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 
 # 2. Strict Security Headers Middleware (Rule 18)
 @app.middleware("http")
@@ -48,6 +49,7 @@ async def add_security_headers_middleware(request: Request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
     return response
+
 
 # 3. Handle Render / Reverse Proxy HTTPS Headers
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
@@ -78,17 +80,12 @@ app.include_router(transactions_router)
 app.include_router(prompts_router)
 
 
-
-
 @app.get("/health", tags=["System Health"])
 async def health_check():
-    return {
-        "status": "healthy",
-        "service": "FinSight RegTech Engine",
-        "version": "2.0.0"
-    }
+    return {"status": "healthy", "service": "FinSight RegTech Engine", "version": "2.0.0"}
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("src.api.main:app", host="0.0.0.0", port=8000, reload=True)

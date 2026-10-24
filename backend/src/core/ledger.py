@@ -1,15 +1,18 @@
+import hashlib
+import json
 import os
 import sys
-import json
-import uuid
-import hashlib
 import threading
-from datetime import datetime, timezone
-from typing import Optional, Dict, Any, Tuple, List
-import psycopg2
-from psycopg2.extras import Json, RealDictCursor
+import uuid
+from datetime import UTC, datetime
+from typing import Any
 
-from src.core.database import get_db_connection, get_connection_pool, _db_initialized, init_db
+from psycopg2.extras import Json
+
+from src.core.database import (
+    get_db_connection,
+    init_db,
+)
 
 # Genesis hash for the initial block in the chain (64 hex zeros)
 GENESIS_HASH = "0" * 64
@@ -41,41 +44,50 @@ def compute_canonical_hash(
     timestamp_utc: datetime,
     model_provenance: str,
     user_query: str,
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     prev_hash: str,
-    org_id: Optional[str] = None
+    org_id: str | None = None,
 ) -> str:
     """
     Computes a deterministic SHA-256 hash of the record's canonical data.
     Keys are sorted and JSON is formatted deterministically without arbitrary whitespace.
     Includes org_id to ensure tenant cryptographic uniqueness.
+    Normalizes datetime to UTC ISO-8601 to ensure deterministic verification regardless of database session timezone.
     """
+    if isinstance(timestamp_utc, str):
+        try:
+            dt = datetime.fromisoformat(timestamp_utc)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=UTC)
+            norm_timestamp = dt.astimezone(UTC).isoformat()
+        except Exception:
+            norm_timestamp = timestamp_utc
+    elif hasattr(timestamp_utc, "astimezone"):
+        dt = timestamp_utc
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        norm_timestamp = dt.astimezone(UTC).isoformat()
+    else:
+        norm_timestamp = str(timestamp_utc)
+
     canonical_dict = {
         "audit_id": str(audit_id),
         "model_provenance": str(model_provenance),
         "org_id": str(org_id) if org_id else "",
         "payload": payload,
         "prev_hash": str(prev_hash),
-        "timestamp": timestamp_utc.isoformat(),
-        "user_query": str(user_query)
+        "timestamp": norm_timestamp,
+        "user_query": str(user_query),
     }
 
-    canonical_bytes = json.dumps(
-        canonical_dict,
-        sort_keys=True,
-        separators=(",", ":"),
-        default=str
-    ).encode("utf-8")
+    canonical_bytes = json.dumps(canonical_dict, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
 
     return hashlib.sha256(canonical_bytes).hexdigest()
 
 
 def append_compliance_record(
-    user_query: str,
-    payload: Dict[str, Any],
-    model_provenance: Optional[str] = None,
-    org_id: Optional[str] = None
-) -> Optional[Dict[str, Any]]:
+    user_query: str, payload: dict[str, Any], model_provenance: str | None = None, org_id: str | None = None
+) -> dict[str, Any] | None:
     """
     Appends a new compliance judgment to the immutable PostgreSQL ledger:
     1. Locks the ledger table in EXCLUSIVE MODE to guarantee linear hash-chain integrity.
@@ -95,10 +107,9 @@ def append_compliance_record(
         if not init_ledger_table():
             return None
 
-    audit_id = uuid.uuid4()
-    timestamp_utc = datetime.now(timezone.utc)
-
     with _ledger_lock:
+        audit_id = uuid.uuid4()
+        timestamp_utc = datetime.now(UTC)
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cursor:
@@ -107,13 +118,16 @@ def append_compliance_record(
 
                     # 1. Fetch the tx_hash of the most recent ledger record FOR THIS SPECIFIC ORG
                     if org_id:
-                        cursor.execute("""
+                        cursor.execute(
+                            """
                             SELECT tx_hash 
                             FROM compliance_ledger 
                             WHERE org_id = %s
                             ORDER BY timestamp DESC, audit_id DESC 
                             LIMIT 1;
-                        """, (str(org_id),))
+                        """,
+                            (str(org_id),),
+                        )
                     else:
                         cursor.execute("""
                             SELECT tx_hash 
@@ -134,24 +148,27 @@ def append_compliance_record(
                         user_query=user_query,
                         payload=payload,
                         prev_hash=prev_hash,
-                        org_id=org_id
+                        org_id=org_id,
                     )
 
                     # 3. Insert the linked record into PostgreSQL
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO compliance_ledger 
                         (audit_id, org_id, timestamp, model_provenance, user_query, payload, prev_hash, tx_hash)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
-                    """, (
-                        str(audit_id),
-                        str(org_id) if org_id else None,
-                        timestamp_utc,
-                        model_provenance,
-                        user_query,
-                        Json(payload),
-                        prev_hash,
-                        tx_hash
-                    ))
+                    """,
+                        (
+                            str(audit_id),
+                            str(org_id) if org_id else None,
+                            timestamp_utc,
+                            model_provenance,
+                            user_query,
+                            Json(payload),
+                            prev_hash,
+                            tx_hash,
+                        ),
+                    )
 
                     conn.commit()
 
@@ -164,7 +181,7 @@ def append_compliance_record(
                         "prev_hash": prev_hash,
                         "tx_hash": tx_hash,
                         "is_genesis": (prev_hash == GENESIS_HASH),
-                        "status": "SECURED_IMMUTABLE"
+                        "status": "SECURED_IMMUTABLE",
                     }
                     return receipt
 
@@ -173,11 +190,7 @@ def append_compliance_record(
             return None
 
 
-def create_genesis_block(
-    org_id: str,
-    org_name: str,
-    admin_email: str
-) -> Optional[Dict[str, Any]]:
+def create_genesis_block(org_id: str, org_name: str, admin_email: str) -> dict[str, Any] | None:
     """
     Generates and anchors the initial 'Genesis Block' (Block #0) for a newly registered organization.
     Prev_hash is guaranteed to be 64 zeros, anchoring the organization's independent ledger chain.
@@ -188,27 +201,24 @@ def create_genesis_block(
         "org_name": org_name,
         "admin_email": admin_email,
         "description": f"Initial Genesis Block for {org_name} regulatory compliance audit ledger.",
-        "status": "INITIALIZED"
+        "status": "INITIALIZED",
     }
 
     user_query = f"GENESIS INITIALIZATION [{org_name}]"
     model_provenance = "SYSTEM_GENESIS_INITIALIZER"
 
     return append_compliance_record(
-        user_query=user_query,
-        payload=genesis_payload,
-        model_provenance=model_provenance,
-        org_id=str(org_id)
+        user_query=user_query, payload=genesis_payload, model_provenance=model_provenance, org_id=str(org_id)
     )
 
 
 def override_ledger_record(
     audit_id: str,
     justification: str,
-    org_id: Optional[str] = None,
-    operator_email: Optional[str] = None,
-    model_provenance: str = "HUMAN_OPERATOR"
-) -> Optional[Dict[str, Any]]:
+    org_id: str | None = None,
+    operator_email: str | None = None,
+    model_provenance: str = "HUMAN_OPERATOR",
+) -> dict[str, Any] | None:
     """
     Implements the 'Human-in-the-Loop' dispute protocol:
     1. Validates that the original audit record exists within the tenant's organization.
@@ -224,10 +234,9 @@ def override_ledger_record(
         if not init_ledger_table():
             return None
 
-    new_audit_id = uuid.uuid4()
-    timestamp_utc = datetime.now(timezone.utc)
-
     with _ledger_lock:
+        new_audit_id = uuid.uuid4()
+        timestamp_utc = datetime.now(UTC)
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cursor:
@@ -236,17 +245,23 @@ def override_ledger_record(
 
                     # 1. Fetch the original record and verify tenant isolation
                     if org_id:
-                        cursor.execute("""
+                        cursor.execute(
+                            """
                             SELECT user_query, payload, org_id 
                             FROM compliance_ledger 
                             WHERE audit_id = %s AND (org_id = %s OR org_id IS NULL);
-                        """, (str(audit_id), str(org_id)))
+                        """,
+                            (str(audit_id), str(org_id)),
+                        )
                     else:
-                        cursor.execute("""
+                        cursor.execute(
+                            """
                             SELECT user_query, payload, org_id 
                             FROM compliance_ledger 
                             WHERE audit_id = %s;
-                        """, (str(audit_id),))
+                        """,
+                            (str(audit_id),),
+                        )
 
                     orig_row = cursor.fetchone()
                     if not orig_row:
@@ -257,13 +272,16 @@ def override_ledger_record(
 
                     # 2. Fetch the most recent tx_hash in the organization's blockchain ledger
                     if record_org_id:
-                        cursor.execute("""
+                        cursor.execute(
+                            """
                             SELECT tx_hash 
                             FROM compliance_ledger 
                             WHERE org_id = %s
                             ORDER BY timestamp DESC, audit_id DESC 
                             LIMIT 1;
-                        """, (str(record_org_id),))
+                        """,
+                            (str(record_org_id),),
+                        )
                     else:
                         cursor.execute("""
                             SELECT tx_hash 
@@ -284,7 +302,7 @@ def override_ledger_record(
                         "operator_email": operator_email or "SYSTEM_OPERATOR",
                         "status": "OVERRIDDEN_BY_HUMAN",
                         "override_timestamp": timestamp_utc.isoformat(),
-                        "action": "HUMAN_DISPUTE_OVERRIDE"
+                        "action": "HUMAN_DISPUTE_OVERRIDE",
                     }
 
                     dispute_query_label = f"[DISPUTE/OVERRIDE] {orig_query}"
@@ -297,24 +315,27 @@ def override_ledger_record(
                         user_query=dispute_query_label,
                         payload=override_payload,
                         prev_hash=prev_hash,
-                        org_id=record_org_id
+                        org_id=record_org_id,
                     )
 
                     # 5. Insert new dispute block into PostgreSQL ledger
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO compliance_ledger 
                         (audit_id, org_id, timestamp, model_provenance, user_query, payload, prev_hash, tx_hash)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
-                    """, (
-                        str(new_audit_id),
-                        str(record_org_id) if record_org_id else None,
-                        timestamp_utc,
-                        model_provenance,
-                        dispute_query_label,
-                        Json(override_payload),
-                        prev_hash,
-                        tx_hash
-                    ))
+                    """,
+                        (
+                            str(new_audit_id),
+                            str(record_org_id) if record_org_id else None,
+                            timestamp_utc,
+                            model_provenance,
+                            dispute_query_label,
+                            Json(override_payload),
+                            prev_hash,
+                            tx_hash,
+                        ),
+                    )
 
                     conn.commit()
 
@@ -327,7 +348,7 @@ def override_ledger_record(
                         "prev_hash": prev_hash,
                         "tx_hash": tx_hash,
                         "status": "OVERRIDDEN_BY_HUMAN",
-                        "justification": str(justification).strip()
+                        "justification": str(justification).strip(),
                     }
                     return receipt
 
@@ -336,7 +357,7 @@ def override_ledger_record(
             raise
 
 
-def verify_ledger_chain(org_id: Optional[str] = None) -> Tuple[bool, int, Optional[str]]:
+def verify_ledger_chain(org_id: str | None = None) -> tuple[bool, int, str | None]:
     """
     Validates the entire cryptographic hash chain for a specific organization from genesis to the most recent block.
     Returns (is_valid, total_records, error_message).
@@ -348,12 +369,15 @@ def verify_ledger_chain(org_id: Optional[str] = None) -> Tuple[bool, int, Option
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
                 if org_id:
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         SELECT audit_id, timestamp, model_provenance, user_query, payload, prev_hash, tx_hash, org_id
                         FROM compliance_ledger
                         WHERE org_id = %s
                         ORDER BY timestamp ASC, audit_id ASC;
-                    """, (str(org_id),))
+                    """,
+                        (str(org_id),),
+                    )
                 else:
                     cursor.execute("""
                         SELECT audit_id, timestamp, model_provenance, user_query, payload, prev_hash, tx_hash, org_id
@@ -369,13 +393,19 @@ def verify_ledger_chain(org_id: Optional[str] = None) -> Tuple[bool, int, Option
                 expected_prev_hash = GENESIS_HASH
 
                 for idx, row in enumerate(rows):
-                    row_audit_id, row_ts, row_model, row_query, row_payload, row_prev_hash, row_tx_hash, row_org_id = row
+                    row_audit_id, row_ts, row_model, row_query, row_payload, row_prev_hash, row_tx_hash, row_org_id = (
+                        row
+                    )
 
                     # Verify previous hash pointer matches expected link in chain
                     if row_prev_hash.strip() != expected_prev_hash.strip():
-                        return False, idx, (
-                            f"Broken chain link at block index {idx} (Audit ID: {row_audit_id}). "
-                            f"Expected prev_hash '{expected_prev_hash}', found '{row_prev_hash.strip()}'."
+                        return (
+                            False,
+                            idx,
+                            (
+                                f"Broken chain link at block index {idx} (Audit ID: {row_audit_id}). "
+                                f"Expected prev_hash '{expected_prev_hash}', found '{row_prev_hash.strip()}'."
+                            ),
                         )
 
                     # Recompute canonical hash
@@ -386,14 +416,18 @@ def verify_ledger_chain(org_id: Optional[str] = None) -> Tuple[bool, int, Option
                         user_query=row_query,
                         payload=row_payload,
                         prev_hash=row_prev_hash.strip(),
-                        org_id=str(row_org_id) if row_org_id else None
+                        org_id=str(row_org_id) if row_org_id else None,
                     )
 
                     # Verify transaction hash authenticity
                     if recomputed_hash != row_tx_hash.strip():
-                        return False, idx, (
-                            f"Tampered content at block index {idx} (Audit ID: {row_audit_id}). "
-                            f"Recorded tx_hash '{row_tx_hash.strip()}', computed '{recomputed_hash}'."
+                        return (
+                            False,
+                            idx,
+                            (
+                                f"Tampered content at block index {idx} (Audit ID: {row_audit_id}). "
+                                f"Recorded tx_hash '{row_tx_hash.strip()}', computed '{recomputed_hash}'."
+                            ),
                         )
 
                     expected_prev_hash = row_tx_hash.strip()
@@ -404,7 +438,7 @@ def verify_ledger_chain(org_id: Optional[str] = None) -> Tuple[bool, int, Option
         return False, 0, f"Ledger verification failed with error: {e}"
 
 
-def get_recent_ledger_blocks(org_id: Optional[str] = None, limit: int = 10) -> list:
+def get_recent_ledger_blocks(org_id: str | None = None, limit: int = 10) -> list:
     """
     Fetches the most recent `limit` cryptographic ledger blocks from PostgreSQL for a specific organization,
     ordered newest first. Ensures strict multi-tenant row-level data isolation.
@@ -416,38 +450,46 @@ def get_recent_ledger_blocks(org_id: Optional[str] = None, limit: int = 10) -> l
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
                 if org_id:
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         SELECT audit_id, timestamp, model_provenance, user_query, payload, prev_hash, tx_hash, org_id
                         FROM compliance_ledger
                         WHERE org_id = %s
                         ORDER BY timestamp DESC, audit_id DESC
                         LIMIT %s;
-                    """, (str(org_id), limit))
+                    """,
+                        (str(org_id), limit),
+                    )
                 else:
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         SELECT audit_id, timestamp, model_provenance, user_query, payload, prev_hash, tx_hash, org_id
                         FROM compliance_ledger
                         ORDER BY timestamp DESC, audit_id DESC
                         LIMIT %s;
-                    """, (limit,))
+                    """,
+                        (limit,),
+                    )
 
                 rows = cursor.fetchall()
                 blocks = []
                 for row in rows:
-                    row_audit_id, row_ts, row_model, row_query, row_payload, row_prev_hash, row_tx_hash, row_org_id = row
-                    blocks.append({
-                        "audit_id": str(row_audit_id),
-                        "org_id": str(row_org_id) if row_org_id else None,
-                        "timestamp": row_ts.isoformat() if hasattr(row_ts, "isoformat") else str(row_ts),
-                        "model_provenance": str(row_model),
-                        "user_query": str(row_query),
-                        "payload": row_payload,
-                        "prev_hash": str(row_prev_hash).strip(),
-                        "tx_hash": str(row_tx_hash).strip()
-                    })
+                    row_audit_id, row_ts, row_model, row_query, row_payload, row_prev_hash, row_tx_hash, row_org_id = (
+                        row
+                    )
+                    blocks.append(
+                        {
+                            "audit_id": str(row_audit_id),
+                            "org_id": str(row_org_id) if row_org_id else None,
+                            "timestamp": row_ts.isoformat() if hasattr(row_ts, "isoformat") else str(row_ts),
+                            "model_provenance": str(row_model),
+                            "user_query": str(row_query),
+                            "payload": row_payload,
+                            "prev_hash": str(row_prev_hash).strip(),
+                            "tx_hash": str(row_tx_hash).strip(),
+                        }
+                    )
                 return blocks
     except Exception as e:
         sys.stderr.write(f"[Ledger Error] Failed to fetch recent ledger blocks: {e}\n")
         return []
-
-

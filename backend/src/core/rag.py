@@ -12,16 +12,17 @@ Features:
 - Cryptographic anchoring to immutable PostgreSQL SHA-256 ledger.
 """
 
+import json
 import os
 import re
 import sys
-import json
 import threading
-from typing import List, Optional, Any, Dict
-from pydantic import BaseModel, Field
-from langchain_core.callbacks import BaseCallbackHandler
+from typing import Any
+
 from langchain_community.vectorstores import FAISS
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_core.callbacks import BaseCallbackHandler
+from pydantic import BaseModel, Field
+
 from src.core.llm import get_gemini_llm
 
 # Dynamically calculate project root to prevent broken relative paths
@@ -39,7 +40,9 @@ class NuclearLogger(BaseCallbackHandler):
         try:
             sys.stderr.write(text)
         except UnicodeEncodeError:
-            safe_text = text.encode(sys.stderr.encoding or "utf-8", errors="backslashreplace").decode(sys.stderr.encoding or "utf-8")
+            safe_text = text.encode(sys.stderr.encoding or "utf-8", errors="backslashreplace").decode(
+                sys.stderr.encoding or "utf-8"
+            )
             sys.stderr.write(safe_text)
 
     def on_chat_model_start(self, serialized, messages, **kwargs):
@@ -79,6 +82,7 @@ class NuclearLogger(BaseCallbackHandler):
 # 1. Define Pydantic Data Contracts
 # =====================================================================
 
+
 class ComplianceCitation(BaseModel):
     document: str = Field(description="The filename of the regulation.")
     page: str = Field(description="The exact page or Article number of the source.")
@@ -101,7 +105,7 @@ class ComplianceJudgment(BaseModel):
             "Ongoing operational recommendations (like periodic DPIA reviews or continuous monitoring) DO NOT make an architecture non-compliant; mark is_compliant=True."
         )
     )
-    citations: List[ComplianceCitation] = Field(
+    citations: list[ComplianceCitation] = Field(
         description="A list of the documents and pages used to make this judgment."
     )
     executive_summary_markdown: str = Field(
@@ -119,25 +123,26 @@ class ComplianceJudgment(BaseModel):
 # 2. Thread-Safe Singleton Cache for Embeddings & Vector Store
 # =====================================================================
 
-_embeddings_instance: Optional[GoogleGenerativeAIEmbeddings] = None
-_vector_db_instance: Optional[FAISS] = None
+_embeddings_instance: Any | None = None
+_vector_db_instance: FAISS | None = None
 _store_lock = threading.RLock()
 
 
-def get_embeddings() -> GoogleGenerativeAIEmbeddings:
+def get_embeddings() -> Any:
     """Returns a thread-safe singleton instance of GoogleGenerativeAIEmbeddings."""
     global _embeddings_instance
     if _embeddings_instance is None:
         with _store_lock:
             if _embeddings_instance is None:
+                from langchain_google_genai.embeddings import (
+                    GoogleGenerativeAIEmbeddings,
+                )
+
                 model_name = DEFAULT_EMBEDDING_MODEL
                 if model_name in ["models/embedding-001", "embedding-001"]:
                     model_name = "models/gemini-embedding-001"
                 api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-                _embeddings_instance = GoogleGenerativeAIEmbeddings(
-                    model=model_name,
-                    google_api_key=api_key
-                )
+                _embeddings_instance = GoogleGenerativeAIEmbeddings(model=model_name, google_api_key=api_key)
     return _embeddings_instance
 
 
@@ -165,9 +170,7 @@ def get_vector_store() -> FAISS:
                 try:
                     embeddings = get_embeddings()
                     _vector_db_instance = FAISS.load_local(
-                        FAISS_INDEX_DIR,
-                        embeddings,
-                        allow_dangerous_deserialization=True
+                        FAISS_INDEX_DIR, embeddings, allow_dangerous_deserialization=True
                     )
                 except Exception as e:
                     raise RuntimeError(
@@ -181,6 +184,7 @@ def get_vector_store() -> FAISS:
 # 3. Regulatory Text Cleaning & Formatting Utilities
 # =====================================================================
 
+
 def clean_regulatory_text(text: str) -> str:
     """
     Cleans and repairs intra-word kerning spaces and spacing artifacts commonly
@@ -190,48 +194,92 @@ def clean_regulatory_text(text: str) -> str:
         return ""
 
     two_letter = {
-        r'\bb\s+y\b': 'by', r'\bt\s+o\b': 'to', r'\bf\s+or\b': 'for', r'\ba\s+n\b': 'an', r'\bi\s+n\b': 'in',
-        r'\bi\s+s\b': 'is', r'\bi\s+t\b': 'it', r'\ba\s+t\b': 'at', r'\bo\s+n\b': 'on', r'\bo\s+r\b': 'or',
-        r'\ba\s+s\b': 'as', r'\bb\s+e\b': 'be', r'\bh\s+e\b': 'he', r'\bm\s+e\b': 'me', r'\bm\s+y\b': 'my',
-        r'\bn\s+o\b': 'no', r'\bs\s+o\b': 'so', r'\bu\s+p\b': 'up', r'\bu\s+s\b': 'us', r'\bw\s+e\b': 'we',
-        r'\bd\s+o\b': 'do', r'\bg\s+o\b': 'go', r'\bi\s+f\b': 'if'
+        r"\bb\s+y\b": "by",
+        r"\bt\s+o\b": "to",
+        r"\bf\s+or\b": "for",
+        r"\ba\s+n\b": "an",
+        r"\bi\s+n\b": "in",
+        r"\bi\s+s\b": "is",
+        r"\bi\s+t\b": "it",
+        r"\ba\s+t\b": "at",
+        r"\bo\s+n\b": "on",
+        r"\bo\s+r\b": "or",
+        r"\ba\s+s\b": "as",
+        r"\bb\s+e\b": "be",
+        r"\bh\s+e\b": "he",
+        r"\bm\s+e\b": "me",
+        r"\bm\s+y\b": "my",
+        r"\bn\s+o\b": "no",
+        r"\bs\s+o\b": "so",
+        r"\bu\s+p\b": "up",
+        r"\bu\s+s\b": "us",
+        r"\bw\s+e\b": "we",
+        r"\bd\s+o\b": "do",
+        r"\bg\s+o\b": "go",
+        r"\bi\s+f\b": "if",
     }
     for pat, rep in two_letter.items():
         text = re.sub(pat, rep, text, flags=re.IGNORECASE)
 
     word_fixes = [
-        (r'\bAr\s+ticle\b', 'Article'), (r'\bar\s+ticle\b', 'article'),
-        (r'\br\s+ight\b', 'right'), (r'\br\s+ights\b', 'rights'),
-        (r'\bJour\s+nal\b', 'Journal'), (r'\bjour\s+nal\b', 'journal'),
-        (r'\bf\s+ollo\s*wing\b', 'following'), (r'\bf\s+orgotten\b', 'forgotten'),
-        (r'\bcr\s+ite\s*r\s*ia\b', 'criteria'), (r'\bpro\s+viding\b', 'providing'),
-        (r'\bpro\s+vided\b', 'provided'), (r'\bpro\s+vision\b', 'provision'),
-        (r'\bpro\s+visions\b', 'provisions'), (r'\bpur\s+poses\b', 'purposes'),
-        (r'\bpur\s+pose\b', 'purpose'), (r'\bother\s+wise\b', 'otherwise'),
-        (r'\bstate\s+ment\b', 'statement'), (r'\bstate\s+ments\b', 'statements'),
-        (r'\bthe\s+y\b', 'they'), (r'\bwhic\s+h\b', 'which'), (r'\ban\s+y\b', 'any'),
-        (r'\bhav\s+e\b', 'have'), (r'\bdat\s+a\b', 'data'), (r'\bdela\s+y\b', 'delay'),
-        (r'\boblig\s+ation\b', 'obligation'), (r'\boblig\s+ations\b', 'obligations'),
-        (r'\bnecessar\s+y\b', 'necessary'), (r'\bcatego\s*r\s*ies\b', 'categories'),
-        (r'\bcategor\s+y\b', 'category'), (r'\bidentifi\s+cation\b', 'identification'),
-        (r'\bbiometr\s+ic\b', 'biometric'), (r'\bbiometr\s+ics\b', 'biometrics'),
-        (r'\bver\s+ification\b', 'verification'), (r'\bauthen\s+tication\b', 'authentication'),
-        (r'\bsecur\s+ity\b', 'security'), (r'\bpers\s+onal\b', 'personal'),
-        (r'\bsyste\s+m\b', 'system'), (r'\bsyste\s+ms\b', 'systems'),
-        (r'\bpr\s+ovider\b', 'provider'), (r'\bpr\s+oviders\b', 'providers'),
-        (r'\bclassifi\s+cation\b', 'classification'), (r'\btranspar\s+ency\b', 'transparency'),
-        (r'\bprohibit\s+ed\b', 'prohibited'), (r'\bprohibit\s+ion\b', 'prohibition'),
-        (r'\bfinanci\s+al\b', 'financial'), (r'\bpay\s+ment\b', 'payment'),
-        (r'\bpay\s+ments\b', 'payments'), (r'\bser\s+vice\b', 'service'),
-        (r'\bser\s+vices\b', 'services'), (r'\bcr\s+itical\b', 'critical')
+        (r"\bAr\s+ticle\b", "Article"),
+        (r"\bar\s+ticle\b", "article"),
+        (r"\br\s+ight\b", "right"),
+        (r"\br\s+ights\b", "rights"),
+        (r"\bJour\s+nal\b", "Journal"),
+        (r"\bjour\s+nal\b", "journal"),
+        (r"\bf\s+ollo\s*wing\b", "following"),
+        (r"\bf\s+orgotten\b", "forgotten"),
+        (r"\bcr\s+ite\s*r\s*ia\b", "criteria"),
+        (r"\bpro\s+viding\b", "providing"),
+        (r"\bpro\s+vided\b", "provided"),
+        (r"\bpro\s+vision\b", "provision"),
+        (r"\bpro\s+visions\b", "provisions"),
+        (r"\bpur\s+poses\b", "purposes"),
+        (r"\bpur\s+pose\b", "purpose"),
+        (r"\bother\s+wise\b", "otherwise"),
+        (r"\bstate\s+ment\b", "statement"),
+        (r"\bstate\s+ments\b", "statements"),
+        (r"\bthe\s+y\b", "they"),
+        (r"\bwhic\s+h\b", "which"),
+        (r"\ban\s+y\b", "any"),
+        (r"\bhav\s+e\b", "have"),
+        (r"\bdat\s+a\b", "data"),
+        (r"\bdela\s+y\b", "delay"),
+        (r"\boblig\s+ation\b", "obligation"),
+        (r"\boblig\s+ations\b", "obligations"),
+        (r"\bnecessar\s+y\b", "necessary"),
+        (r"\bcatego\s*r\s*ies\b", "categories"),
+        (r"\bcategor\s+y\b", "category"),
+        (r"\bidentifi\s+cation\b", "identification"),
+        (r"\bbiometr\s+ic\b", "biometric"),
+        (r"\bbiometr\s+ics\b", "biometrics"),
+        (r"\bver\s+ification\b", "verification"),
+        (r"\bauthen\s+tication\b", "authentication"),
+        (r"\bsecur\s+ity\b", "security"),
+        (r"\bpers\s+onal\b", "personal"),
+        (r"\bsyste\s+m\b", "system"),
+        (r"\bsyste\s+ms\b", "systems"),
+        (r"\bpr\s+ovider\b", "provider"),
+        (r"\bpr\s+oviders\b", "providers"),
+        (r"\bclassifi\s+cation\b", "classification"),
+        (r"\btranspar\s+ency\b", "transparency"),
+        (r"\bprohibit\s+ed\b", "prohibited"),
+        (r"\bprohibit\s+ion\b", "prohibition"),
+        (r"\bfinanci\s+al\b", "financial"),
+        (r"\bpay\s+ment\b", "payment"),
+        (r"\bpay\s+ments\b", "payments"),
+        (r"\bser\s+vice\b", "service"),
+        (r"\bser\s+vices\b", "services"),
+        (r"\bcr\s+itical\b", "critical"),
     ]
     for pattern, replacement in word_fixes:
         text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
 
-    suffix_pattern = r'\b([a-zA-Z]{3,})\s+(ed|ing|tion|tions|ment|ments|ty|ties|ly|able|ible|ness|ful|less|al|ive|ous|ic|ise|ize|ised|ized|ising|izing)\b'
-    text = re.sub(suffix_pattern, r'\1\2', text, flags=re.IGNORECASE)
+    suffix_pattern = r"\b([a-zA-Z]{3,})\s+(ed|ing|tion|tions|ment|ments|ty|ties|ly|able|ible|ness|ful|less|al|ive|ous|ic|ise|ize|ised|ized|ising|izing)\b"
+    text = re.sub(suffix_pattern, r"\1\2", text, flags=re.IGNORECASE)
 
-    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r"[ \t]+", " ", text)
     return text.strip()
 
 
@@ -272,16 +320,16 @@ def format_markdown_report(text: str) -> str:
         return ""
     t = text.replace("\r\n", "\n").replace("\\n", "\n")
     # Ensure headings have single blank line separation
-    t = re.sub(r'(?<!\n)\s*(#{1,6}\s+)', r'\n\1', t)
-    
+    t = re.sub(r"(?<!\n)\s*(#{1,6}\s+)", r"\n\1", t)
+
     lines = t.split("\n")
     formatted_lines = []
     for line in lines:
         stripped = line.strip()
         if stripped.startswith("#"):
             match = re.match(
-                r'^(#{1,6}\s+(?:(?:\d+\.\s*)?[A-Z][A-Za-z0-9\s/&,-]{2,50}?))\s+([A-Z][a-z]+(?:\s+[a-z]+){2,}.*)$',
-                stripped
+                r"^(#{1,6}\s+(?:(?:\d+\.\s*)?[A-Z][A-Za-z0-9\s/&,-]{2,50}?))\s+([A-Z][a-z]+(?:\s+[a-z]+){2,}.*)$",
+                stripped,
             )
             if match:
                 heading_part = match.group(1).strip()
@@ -291,7 +339,7 @@ def format_markdown_report(text: str) -> str:
         formatted_lines.append(line)
 
     t = "\n".join(formatted_lines)
-    t = re.sub(r'\n{3,}', '\n\n', t)
+    t = re.sub(r"\n{3,}", "\n\n", t)
     return t.strip()
 
 
@@ -331,7 +379,8 @@ def _extract_chunk_text(content: Any) -> str:
 # 4. Prompt Engineering & 3-State Agentic Auditor Logic
 # =====================================================================
 
-def format_conversation_history(history: Optional[List[Dict[str, Any]]]) -> str:
+
+def format_conversation_history(history: list[dict[str, Any]] | None) -> str:
     """
     Formats multi-turn conversation history into a structured dialogue block.
     """
@@ -430,11 +479,12 @@ def build_system_prompt(jurisdiction_str: str, mode: str = "strict") -> str:
 # 5. Core RAG Evaluation Functions
 # =====================================================================
 
+
 def query_compliance_engine(
     user_query: str,
-    jurisdictions: Optional[List[str]] = None,
-    history: Optional[List[Dict[str, Any]]] = None,
-    mode: str = "strict"
+    jurisdictions: list[str] | None = None,
+    history: list[dict[str, Any]] | None = None,
+    mode: str = "strict",
 ) -> dict:
     """
     Takes a query and conversation history, retrieves context from FAISS with optional multi-jurisdictional filtering,
@@ -448,9 +498,10 @@ def query_compliance_engine(
     vector_db = get_vector_store()
 
     # 2. Configure FAISS search kwargs with metadata filtering
-    search_kwargs: Dict[str, Any] = {"k": 3}
+    search_kwargs: dict[str, Any] = {"k": 3}
 
     if jurisdictions and len(jurisdictions) > 0:
+
         def jurisdiction_filter(metadata: dict) -> bool:
             doc_jurisdiction = str(metadata.get("jurisdiction", "")).strip().upper()
             doc_source = str(metadata.get("source", "")).strip().upper()
@@ -459,7 +510,7 @@ def query_compliance_engine(
                 t_clean = target.strip().upper()
                 if doc_jurisdiction and (t_clean in doc_jurisdiction or doc_jurisdiction in t_clean):
                     return True
-                tokens = [tok for tok in re.split(r'[^A-Z0-9]+', t_clean) if len(tok) >= 2]
+                tokens = [tok for tok in re.split(r"[^A-Z0-9]+", t_clean) if len(tok) >= 2]
                 if any(token in doc_source for token in tokens):
                     return True
             return False
@@ -482,7 +533,7 @@ def query_compliance_engine(
                 f"* **Status**: ✅ Minimal Risk - No matching regulatory restrictions found for {jurisdiction_label}.\n\n"
                 f"### 📋 Operational Recommendations\n"
                 f"1. **Ingest Regulatory Corpus**: Verify that all official statutory articles for {jurisdiction_label} are indexed in FAISS.\n"
-            )
+            ),
         }
 
     # 3. Construct the context wall with cleaned text
@@ -508,10 +559,7 @@ def query_compliance_engine(
         f"Perform the compliance analysis:"
     )
 
-    messages = [
-        ("system", system_prompt),
-        ("human", human_content)
-    ]
+    messages = [("system", system_prompt), ("human", human_content)]
 
     # 5. Initialize LLM and force Native Structured Output at the API level
     llm = get_gemini_llm()
@@ -520,10 +568,7 @@ def query_compliance_engine(
     nuclear_tracker = NuclearLogger()
 
     try:
-        parsed_obj = structured_llm.invoke(
-            messages,
-            config={"callbacks": [nuclear_tracker]}
-        )
+        parsed_obj = structured_llm.invoke(messages, config={"callbacks": [nuclear_tracker]})
     except Exception as e:
         sys.stderr.write(f"[LLM Error] Structured output invocation failed: {e}\n")
         raise RuntimeError(f"Compliance engine evaluation failed: {e}") from e
@@ -570,14 +615,19 @@ def query_compliance_engine(
                 doc_source = str(doc.metadata.get("source", "")).strip().lower()
                 doc_page = _extract_digits(doc.metadata.get("page", str(doc.metadata.get("article_number", ""))))
 
-                doc_match = (not cit_doc or not doc_source) or (doc_source == cit_doc or cit_doc in doc_source or doc_source in cit_doc)
+                doc_match = (not cit_doc or not doc_source) or (
+                    doc_source == cit_doc or cit_doc in doc_source or doc_source in cit_doc
+                )
                 page_match = (doc_page == cit_page) if (doc_page and cit_page) else True
 
                 if doc_match and page_match:
                     normalized_doc_content = _normalize_text(doc.page_content)
-                    
+
                     if is_long_enough:
-                        if normalized_fragment in normalized_doc_content or normalized_doc_content in normalized_fragment:
+                        if (
+                            normalized_fragment in normalized_doc_content
+                            or normalized_doc_content in normalized_fragment
+                        ):
                             best_chunk_text = clean_regulatory_text(" ".join(doc.page_content.split()))
                             break
 
@@ -594,15 +644,17 @@ def query_compliance_engine(
             unique_citations.append(cit_dict)
 
     result_dict["citations"] = unique_citations
-    result_dict["executive_summary_markdown"] = format_markdown_report(result_dict.get("executive_summary_markdown", ""))
+    result_dict["executive_summary_markdown"] = format_markdown_report(
+        result_dict.get("executive_summary_markdown", "")
+    )
     return result_dict
 
 
 async def astream_compliance_engine(
     user_query: str,
-    jurisdictions: Optional[List[str]] = None,
-    history: Optional[List[Dict[str, Any]]] = None,
-    mode: str = "strict"
+    jurisdictions: list[str] | None = None,
+    history: list[dict[str, Any]] | None = None,
+    mode: str = "strict",
 ):
     """
     High-speed asynchronous streaming generator with multi-turn conversational memory:
@@ -617,9 +669,10 @@ async def astream_compliance_engine(
 
     # 1. Retrieve the cached vector database singleton
     vector_db = get_vector_store()
-    search_kwargs: Dict[str, Any] = {"k": 3}
+    search_kwargs: dict[str, Any] = {"k": 3}
 
     if jurisdictions and len(jurisdictions) > 0:
+
         def jurisdiction_filter(metadata: dict) -> bool:
             doc_jurisdiction = str(metadata.get("jurisdiction", "")).strip().upper()
             doc_source = str(metadata.get("source", "")).strip().upper()
@@ -628,7 +681,7 @@ async def astream_compliance_engine(
                 t_clean = target.strip().upper()
                 if doc_jurisdiction and (t_clean in doc_jurisdiction or doc_jurisdiction in t_clean):
                     return True
-                tokens = [tok for tok in re.split(r'[^A-Z0-9]+', t_clean) if len(tok) >= 2]
+                tokens = [tok for tok in re.split(r"[^A-Z0-9]+", t_clean) if len(tok) >= 2]
                 if any(token in doc_source for token in tokens):
                     return True
             return False
@@ -648,16 +701,12 @@ async def astream_compliance_engine(
         if dedup_key not in seen_sources:
             seen_sources.add(dedup_key)
             cleaned_snippet = clean_regulatory_text(doc.page_content)
-            citations.append({
-                "document": source_file,
-                "page": str(art_label),
-                "quoted_text": cleaned_snippet
-            })
+            citations.append({"document": source_file, "page": str(art_label), "quoted_text": cleaned_snippet})
 
     yield {
         "type": "start",
         "jurisdictions": jurisdictions or ["EU (AI Act, GDPR, PSD2, MiCA, DORA)"],
-        "citations": citations
+        "citations": citations,
     }
 
     if not relevant_docs:
@@ -694,10 +743,7 @@ async def astream_compliance_engine(
         f"Perform the compliance analysis:"
     )
 
-    messages = [
-        ("system", system_prompt),
-        ("human", human_content)
-    ]
+    messages = [("system", system_prompt), ("human", human_content)]
 
     llm = get_gemini_llm()
     nuclear_tracker = NuclearLogger()
