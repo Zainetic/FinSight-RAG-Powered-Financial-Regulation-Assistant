@@ -604,6 +604,7 @@ def query_compliance_engine(
             cit_page = _extract_digits(cit_dict.get("page", ""))
 
             best_chunk_text = None
+            best_chunk_doc = None
             best_overlap_score = 0.0
 
             is_long_enough = (
@@ -629,17 +630,32 @@ def query_compliance_engine(
                             or normalized_doc_content in normalized_fragment
                         ):
                             best_chunk_text = clean_regulatory_text(" ".join(doc.page_content.split()))
+                            best_chunk_doc = doc
                             break
 
                         overlap_score = _calculate_token_overlap(normalized_fragment, normalized_doc_content)
                         if overlap_score >= 0.60 and overlap_score > best_overlap_score:
                             best_overlap_score = overlap_score
                             best_chunk_text = clean_regulatory_text(" ".join(doc.page_content.split()))
+                            best_chunk_doc = doc
 
-            if best_chunk_text:
+            if best_chunk_text and best_chunk_doc:
+                cit_dict["document"] = best_chunk_doc.metadata.get("source", cit_dict.get("document", ""))
+                cit_dict["page"] = str(best_chunk_doc.metadata.get("article_label", cit_dict.get("page", "")))
                 cit_dict["quoted_text"] = best_chunk_text
-            else:
-                cit_dict["quoted_text"] = clean_regulatory_text(cit_dict.get("quoted_text", ""))
+            elif relevant_docs:
+                # Algorithmic fallback: select exact span from retrieved FAISS chunk matching document or highest relevance
+                matched_fallback = None
+                for doc in relevant_docs:
+                    ds = str(doc.metadata.get("source", "")).strip().lower()
+                    if cit_doc and (ds == cit_doc or cit_doc in ds or ds in cit_doc):
+                        matched_fallback = doc
+                        break
+                if not matched_fallback:
+                    matched_fallback = relevant_docs[0]
+                cit_dict["document"] = matched_fallback.metadata.get("source", "EU Regulation")
+                cit_dict["page"] = str(matched_fallback.metadata.get("article_label", "Article 1"))
+                cit_dict["quoted_text"] = clean_regulatory_text(" ".join(matched_fallback.page_content.split()))
 
             unique_citations.append(cit_dict)
 
