@@ -24,6 +24,7 @@ load_dotenv()
 # 1. Security Configuration
 # =====================================================================
 
+
 def get_jwt_secret_key() -> str:
     key = os.getenv("JWT_SECRET_KEY")
     if not key:

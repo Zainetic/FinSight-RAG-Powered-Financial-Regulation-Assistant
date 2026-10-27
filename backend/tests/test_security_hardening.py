@@ -7,9 +7,7 @@ Tests:
    and only exact configured origins from FRONTEND_ORIGINS (or defaults) are permitted.
 """
 
-import os
 import pytest
-from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 

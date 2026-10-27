@@ -7,17 +7,16 @@ Tests that citations generated across the pipeline:
 3. Citation Verifier: Validates that quotes match raw statutory corpora in backend/data/raw_statutes/*.txt.
 """
 
-import sys
 import os
-import pytest
+import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BACKEND_DIR = os.path.dirname(SCRIPT_DIR)
 sys.path.insert(0, BACKEND_DIR)
 
+from scripts.verify_citations import verify_single_citation
 from src.schemas.transaction import TransactionPayload
 from src.services.transactions import evaluate_transaction
-from scripts.verify_citations import verify_single_citation
 
 
 def test_sanctions_fastpath_citation_is_verbatim_confirmed():
