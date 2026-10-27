@@ -14,6 +14,8 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BACKEND_DIR = os.path.dirname(SCRIPT_DIR)
 sys.path.insert(0, BACKEND_DIR)
 
+from unittest.mock import MagicMock, patch
+
 from scripts.verify_citations import verify_single_citation
 from src.schemas.transaction import TransactionPayload
 from src.services.transactions import evaluate_transaction
@@ -72,10 +74,28 @@ def test_faiss_transaction_citations_grounded():
         payment_method="SEPA_INSTANT",
         sca_authenticated=True,
     )
-    result = evaluate_transaction(tx)
+
+    mock_doc = MagicMock()
+    mock_doc.page_content = (
+        "In recent years, the security risks relating to electronic payments have increased. "
+        "This is due to the growing technical complexity of electronic payments, the continuously "
+        "growing volumes of electronic payments worldwide and emerging types of payment services."
+    )
+    mock_doc.metadata = {
+        "source": "PSD2 Directive (EU) 2015/2366",
+        "article_label": "Recital (7)",
+        "title": "PSD2 - Recital (7)",
+    }
+
+    mock_vector_store = MagicMock()
+    mock_vector_store.similarity_search.return_value = [mock_doc]
+
+    with patch("src.services.transactions.get_vector_store", return_value=mock_vector_store):
+        result = evaluate_transaction(tx)
+
     assert result.citations is not None and len(result.citations) > 0
     for cit in result.citations:
         verification = verify_single_citation(cit)
-        assert verification["status"] in ("VERBATIM_CONFIRMED", "PARTIAL_MATCH"), (
-            f"Citation failed grounding: {cit} -> {verification}"
-        )
+        assert verification["status"] == "VERBATIM_CONFIRMED", f"Citation failed grounding: {cit} -> {verification}"
+        assert verification["is_verbatim"] is True
+        assert verification["source_file"] == "psd2_raw.txt"
