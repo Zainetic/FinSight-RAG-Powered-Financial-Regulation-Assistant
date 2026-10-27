@@ -131,14 +131,46 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
             f"Blocked: {target_country} is subject to comprehensive international financial sanctions and FATF embargo."
         )
         violations = [f"International Sanctions Embargo ({target_country})"]
-        applicable_regs = ["EU Regulation 2024/1624 Art. 29", "FATF Blacklist"]
-        sanction_citations = [
-            {
-                "document": "EU Regulation 2024/1624",
-                "page": "Article 29",
-                "quoted_text": "Credit institutions and financial entities are prohibited from processing, clearing, or executing fund transfers originating from or destined for territories subject to international sanctions and asset freeze directives.",
-            }
-        ]
+        applicable_regs = ["TFR Regulation (EU) 2023/1113 Art. 23", "FATF Blacklist"]
+
+        # Algorithmically grounded citation extracted directly from indexed restrictive measures statute chunk
+        sanction_doc = None
+        try:
+            vector_store = get_vector_store()
+            if vector_store:
+                docs = [
+                    d
+                    for d in vector_store.similarity_search("TFR Article 23 restrictive measures", k=10)
+                    if d.metadata.get("source") == "TFR" and d.metadata.get("article_number") == 23
+                ]
+                if docs:
+                    sanction_doc = docs[0]
+        except Exception:
+            pass
+
+        if sanction_doc:
+            doc_act = sanction_doc.metadata.get("source", "TFR")
+            doc_art = sanction_doc.metadata.get("article_label", "Article 23")
+            sanction_quote = clean_regulatory_text(sanction_doc.page_content).strip()
+            sanction_citations = [
+                {
+                    "document": f"{doc_act} Regulation (EU) 2023/1113",
+                    "page": str(doc_art),
+                    "quoted_text": sanction_quote,
+                }
+            ]
+        else:
+            sanction_citations = [
+                {
+                    "document": "TFR Regulation (EU) 2023/1113",
+                    "page": "Article 23",
+                    "quoted_text": (
+                        "Payment service providers and crypto-asset service providers shall have in place internal "
+                        "policies, procedures and controls to ensure the implementation of Union and national restrictive "
+                        "measures when performing transfers of funds and crypto-assets under this Regulation."
+                    ),
+                }
+            ]
 
         hash_payload = {
             "transaction_id": tx_id,
@@ -164,7 +196,7 @@ def evaluate_transaction(tx: TransactionPayload) -> TransactionEvaluationResult:
             audit_rationale=rationale,
             citations=sanction_citations,
             rule_triggered="FATF High-Risk Jurisdiction - International Sanctions & Total Embargo",
-            legal_basis="EU Regulation 2024/1624 Art. 29 & FATF Blacklist",
+            legal_basis="TFR Regulation (EU) 2023/1113 Art. 23 & FATF Blacklist",
             sha256_audit_hash=sha256_audit_hash,
             timestamp=timestamp,
             raw_payload_preview=tx.model_dump(),

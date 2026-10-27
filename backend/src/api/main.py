@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
@@ -54,19 +55,23 @@ async def add_security_headers_middleware(request: Request, call_next):
 # 3. Handle Render / Reverse Proxy HTTPS Headers
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
-# 4. CORS Configuration with Credential & HttpOnly Cookie Support (Rule 9)
-origins = [
+# 4. CORS Configuration with Credential & HttpOnly Cookie Support
+default_origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://finsight-phi-ten.vercel.app",
     "https://finsight.vercel.app",
 ]
 
-origin_regex = r"https://.*\.vercel\.app"
+frontend_origins_env = os.getenv("FRONTEND_ORIGINS") or os.getenv("CORS_ALLOWED_ORIGINS")
+if frontend_origins_env:
+    allowed_origins = [orig.strip() for orig in frontend_origins_env.split(",") if orig.strip()]
+else:
+    allowed_origins = default_origins
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_origin_regex=origin_regex,
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],

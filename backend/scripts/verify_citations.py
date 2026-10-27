@@ -304,6 +304,33 @@ def run_database_audit() -> list[dict[str, Any]]:
     return results
 
 
+def run_runs_dir_audit(runs_dir: str) -> list[dict[str, Any]]:
+    """Audits citations from raw output JSON files in a runs directory."""
+    results = []
+    if not os.path.exists(runs_dir):
+        print(f"Directory not found: {runs_dir}", flush=True)
+        return results
+
+    json_files = [f for f in sorted(os.listdir(runs_dir)) if f.endswith(".json") and f != "manifest_20_runs.json"]
+    print(f"Loading citations from {len(json_files)} run files in {runs_dir}...", flush=True)
+    for fname in json_files:
+        fpath = os.path.join(runs_dir, fname)
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            run_id = data.get("id", fname)
+            citations = data.get("citations", [])
+            for cit in citations:
+                if isinstance(cit, dict):
+                    v = verify_single_citation(cit)
+                    v["run_id"] = run_id
+                    v["run_type"] = data.get("run_type", "unknown")
+                    results.append(v)
+        except Exception as e:
+            print(f"Error reading {fname}: {e}", flush=True)
+    return results
+
+
 def print_report_table(results: list[dict[str, Any]], title: str):
     """Prints a structured Markdown summary table of verification results."""
     total = len(results)
@@ -322,15 +349,16 @@ def print_report_table(results: list[dict[str, Any]], title: str):
     print(f"Ungrounded / Hallucinated: {ungrounded_count}")
     print("=" * 80)
 
-    print("\n| # | Document / Act | Page / Article | Status | Match Length | Source Corpus |")
-    print("| :--- | :--- | :--- | :---: | :---: | :--- |")
+    print("\n| # | ID / Source | Document / Act | Page / Article | Status | Match Length | Source Corpus |")
+    print("| :--- | :--- | :--- | :--- | :---: | :---: | :--- |")
     for i, r in enumerate(results, 1):
+        ident = r.get("run_id") or r.get("audit_id") or f"Sample-{i}"
         doc = r.get("document", "N/A")[:28]
         pg = r.get("page", "N/A")[:18]
         st = r.get("status", "N/A")
         ln = r.get("character_length", 0)
         src = r.get("source_file", "N/A")
-        print(f"| {i} | {doc} | {pg} | `{st}` | {ln} chars | `{src}` |")
+        print(f"| {i} | `{ident}` | {doc} | {pg} | `{st}` | {ln} chars | `{src}` |")
     print("=" * 80 + "\n")
 
 
@@ -338,9 +366,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="FinSight RegTech Citation Verifier")
     parser.add_argument("--self-test", action="store_true", help="Run self-test on known statutory excerpts")
     parser.add_argument("--db", action="store_true", help="Audit citations stored in PostgreSQL audit ledger")
+    parser.add_argument("--runs-dir", type=str, default=None, help="Directory containing raw JSON citation runs")
     args = parser.parse_args()
 
-    if args.db:
+    if args.runs_dir:
+        print(f"Auditing citations from runs directory: {args.runs_dir}...", flush=True)
+        runs_results = run_runs_dir_audit(args.runs_dir)
+        if runs_results:
+            print_report_table(runs_results, f"Fresh Pipeline Runs ({args.runs_dir})")
+        else:
+            print("No citations found in the specified runs directory.", flush=True)
+    elif args.db:
         print("Auditing citations from PostgreSQL audit ledger...", flush=True)
         db_results = run_database_audit()
         if db_results:

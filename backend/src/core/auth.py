@@ -24,7 +24,18 @@ load_dotenv()
 # 1. Security Configuration
 # =====================================================================
 
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "finsight-regtech-jwt-secret-2026-super-secure-cryptographic-signing-key")
+
+def get_jwt_secret_key() -> str:
+    key = os.getenv("JWT_SECRET_KEY")
+    if not key:
+        raise RuntimeError(
+            "Critical Security Error: JWT_SECRET_KEY environment variable is not set. "
+            "The application refuses to start with an insecure or missing signing key."
+        )
+    return key
+
+
+JWT_SECRET_KEY = get_jwt_secret_key()
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # 24 Hours default
 AUTH_COOKIE_NAME = "finsight_access_token"
